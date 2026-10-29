@@ -5,6 +5,7 @@
 import { refreshBmfFeed } from './bmf-feed.js';
 import { createMailer } from './mail.js';
 import { confirmPasswordReset, languageOf, requestPasswordReset } from './password-reset.js';
+import { startCheck } from './check-request.js';
 
 function json(body, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -48,12 +49,31 @@ async function passwordResetConfirm(request, env) {
   return result.ok ? new Response(null, { status: 204 }) : json({ error: result.error }, 400);
 }
 
+// TODO(SCRUM-14): replace with the real session lookup once login is merged.
+// Until then nobody is logged in, so the route answers 401.
+async function currentUser(request, env) {
+  return null;
+}
+
+// SCRUM-16: POST /api/requests { vat, fn } -> 202 { requestId }
+async function startCheckRoute(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: 'NOT_LOGGED_IN' }, 401);
+
+  const { vat, fn } = await readJson(request);
+  const result = await startCheck({ db: env.DB }, user, { vat, fn });
+
+  if (result.ok) return json({ requestId: result.requestId }, 202);
+  return json({ error: result.error }, result.error === 'FORBIDDEN' ? 403 : 400);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (pathname === '/api/health') return health(env);
     if (request.method === 'POST' && pathname === '/api/password-reset') return passwordReset(request, env, ctx);
     if (request.method === 'POST' && pathname === '/api/password-reset/confirm') return passwordResetConfirm(request, env);
+    if (request.method === 'POST' && pathname === '/api/requests') return startCheckRoute(request, env);
     if (pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     return env.ASSETS.fetch(request);
   },
