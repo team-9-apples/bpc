@@ -97,7 +97,9 @@ The VIES adapter (SCRUM-66, `src/adapters/vies.js`) checks VAT numbers of every 
 - A number without an EU prefix is `INVALID` without calling VIES. If VIES or a member state's service is down, the result is `UNAVAILABLE`.
 - `VIES_URL` overrides the endpoint, for example with the VIES test service, where `100` is a valid and `200` an invalid number.
 
-The Sprint 1 proof of concept (DI-07, SCRUM-25) runs one check through all adapters and reads the live BMF feed:
+The BMF adapter (SCRUM-19, `src/adapters/bmf.js`) looks the partner up in the last good copy of the BMF list, by VAT number, then by FN: listed is `INVALID` with the listed entry, not listed is `VALID`, and no copy yet is `UNAVAILABLE`. Both answers include when the list was fetched and published.
+
+The Sprint 1 proof of concept (DI-07, SCRUM-25) loads the live BMF feed into a temporary database and runs one check through all adapters:
 
 ```sh
 npm run poc -- ATU12345678      # real VIES
