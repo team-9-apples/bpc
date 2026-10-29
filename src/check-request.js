@@ -1,9 +1,15 @@
 // SCRUM-16: start a partner check by VAT number (optional FN).
 
-// Takes whatever the user typed and returns either
-//   { ok: true, vat: 'ATU12345678' }   (cleaned up)
-// or
-//   { ok: false, error: 'INVALID_VAT' }
+// One regex per EU country, keyed by the 2-letter prefix.
+const VAT_FORMATS = {
+  AT: /^ATU\d{8}$/,   // ATU + 8 digits
+  DE: /^DE\d{9}$/,    // DE + 9 digits
+  // more countries later
+};
+
+
+
+// Takes whatever the user typed and returns either: { ok: true, vat: 'ATU12345678' }   (cleaned up) or, { ok: false, error: 'INVALID_VAT' }
 export function validateVat(input) {
   // if input is not a string, return the error
   if (typeof input !== 'string') {
@@ -13,10 +19,20 @@ export function validateVat(input) {
   // remove spaces and dots, make it uppercase
   const cleaned = input.replace(/[\s.]/g, '').toUpperCase();
 
-  const re = /^ATU\d{8}$/;
+  // the first two letters are the country
+  const country = cleaned.slice(0, 2)
 
+  // look up the regex for that country
+  const re = VAT_FORMATS[country]
+
+  // unknown country -> error
+  if (!re) {
+    return { ok: false, error: 'INVALID_VAT'}
+  }
+
+  // wrong format for that country -> error
   if (!re.test(cleaned)) {
-    return { ok: false, error: 'INVALID_VAT' };   // failed: error
+    return { ok: false, error: 'INVALID_VAT' };
   }
 
   return { ok: true, vat: cleaned };   // passed everything: success

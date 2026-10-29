@@ -21,3 +21,18 @@ test('numbers and no text, are rejected', () => {
   assert.deepEqual(validateVat(''), { ok: false, error: 'INVALID_VAT' });
   assert.deepEqual(validateVat(12345), { ok: false, error: 'INVALID_VAT' });
 });
+
+//  - 'DE123456789' is accepted.
+test('Deutschland is accepted', () => {
+  assert.deepEqual(validateVat('DE123456789'), { ok: true, vat: 'DE123456789' });
+});
+
+//  - 'XX123456789' is rejected (unknown country).
+test('unknown country is rejected', () => {
+  assert.deepEqual(validateVat('XX123456789'), { ok: false, error: 'INVALID_VAT' });
+});
+
+//  - 'DE12345678' is rejected (one digit short for Germany).
+test('DE VAT number too short', () => {
+  assert.deepEqual(validateVat('DE12345678'), { ok: false, error: 'INVALID_VAT' });
+});
