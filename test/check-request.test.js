@@ -8,33 +8,27 @@ test('a valid Austrian VAT number is accepted', () => {
   assert.deepEqual(validateVat('ATU12345678'), { ok: true, vat: 'ATU12345678' });
 });
 
-//  - 'atu 1234 5678' is accepted and cleaned to 'ATU12345678'
 test('spaces and lowercase cleaned up', () => {
   assert.deepEqual(validateVat('atu 1234 5678'), { ok: true, vat: 'ATU12345678' });
 });
 
-//  - 'ATU1234567' (one digit short) gives { ok: false, error: 'INVALID_VAT' }
 test('one digit short produces an error', () => {
   assert.deepEqual(validateVat('ATU1234567'), { ok: false, error: 'INVALID_VAT' });
 });
 
-//  - '' and 12345 (a number, not text) are rejected
 test('numbers and no text, are rejected', () => {
   assert.deepEqual(validateVat(''), { ok: false, error: 'INVALID_VAT' });
   assert.deepEqual(validateVat(12345), { ok: false, error: 'INVALID_VAT' });
 });
 
-//  - 'DE123456789' is accepted.
 test('Deutschland is accepted', () => {
   assert.deepEqual(validateVat('DE123456789'), { ok: true, vat: 'DE123456789' });
 });
 
-//  - 'XX123456789' is rejected (unknown country).
 test('unknown country is rejected', () => {
   assert.deepEqual(validateVat('XX123456789'), { ok: false, error: 'INVALID_VAT' });
 });
 
-//  - 'DE12345678' is rejected (one digit short for Germany).
 test('DE VAT number too short', () => {
   assert.deepEqual(validateVat('DE12345678'), { ok: false, error: 'INVALID_VAT' });
 });
@@ -59,8 +53,6 @@ test('an FN without the check letter is rejected', () => {
 test('an FN that is not digits plus a letter is rejected', () => {
   assert.deepEqual(validateFn('abc'), { ok: false, error: 'INVALID_FN' });
 });
-
-
 
 // ---- startCheck: these use a real SQLite database in memory ----
 
@@ -93,7 +85,8 @@ function setup() {
       (11, 1, 'admin@example.at',  'Anna', 'Admin',   'ADMIN',        'ACTIVE'),
       (12, 1, 'review@example.at', 'Rudi', 'Review',  'REVIEW_USER',  'ACTIVE');
   `);
-  const user = (id) => db.sqlite.prepare('SELECT id, organisation_id, role FROM users WHERE id = ?').get(id);
+  // Same shape as the user that currentUser() in auth.js returns.
+  const user = (id) => db.sqlite.prepare('SELECT id, organisation_id AS organisationId, role FROM users WHERE id = ?').get(id);
   return { db, user };
 }
 

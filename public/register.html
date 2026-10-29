@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BizPartnerCheck – Register</title>
+  <script src="/clerk.js"></script>
+</head>
+<body>
+  <!-- SCRUM-12 (FR-ORG-01): free registration of an organisation and its first
+       Organisation Admin. No payment data is asked for. -->
+  <h1 id="title"></h1>
+  <p id="intro"></p>
+
+  <form id="register-form" novalidate>
+    <fieldset>
+      <legend id="organisation-legend"></legend>
+      <label><span id="organisationName-label"></span><br><input name="organisationName" required maxlength="200" autocomplete="organization"></label>
+      <small data-error-for="organisationName"></small><br>
+      <label><span id="organisationNumber-label"></span><br><input name="organisationNumber" required placeholder="FN 123456a"></label>
+      <small data-error-for="organisationNumber"></small>
+    </fieldset>
+    <fieldset>
+      <legend id="admin-legend"></legend>
+      <label><span id="firstName-label"></span><br><input name="firstName" required maxlength="200" autocomplete="given-name"></label>
+      <small data-error-for="firstName"></small><br>
+      <label><span id="lastName-label"></span><br><input name="lastName" required maxlength="200" autocomplete="family-name"></label>
+      <small data-error-for="lastName"></small><br>
+      <label><span id="email-label"></span><br><input type="email" name="email" required autocomplete="email"></label>
+      <small data-error-for="email"></small>
+    </fieldset>
+    <p><button type="submit" id="register-button"></button></p>
+  </form>
+
+  <p id="message" role="status"></p>
+  <!-- SCRUM-104: after registering, the admin creates the Clerk account with the same
+       e-mail address; Clerk sends the verification link (FR-ORG-02). -->
+  <div id="sign-up"></div>
+
+  <script>
+    const texts = {
+      en: {
+        title: 'Register your organisation',
+        intro: 'Registration is free. All fields are required.',
+        organisation: 'Organisation',
+        organisationName: 'Organisation name',
+        organisationNumber: 'Company register number (Firmenbuchnummer)',
+        admin: 'First Organisation Admin',
+        firstName: 'First name',
+        lastName: 'Last name',
+        email: 'E-mail address',
+        register: 'Register',
+        REQUIRED: 'Please fill in this field.',
+        TOO_LONG: 'This is too long (at most 200 characters).',
+        INVALID_organisationNumber: 'Please enter a company register number like FN 123456a.',
+        INVALID_email: 'Please enter a valid e-mail address.',
+        ORGANISATION_EXISTS: 'An organisation with this company register number is already registered.',
+        EMAIL_IN_USE: 'This e-mail address is already used by another account.',
+        done: 'Your organisation is registered. Now choose a password. We will then send you an e-mail with a link to confirm your address.',
+        failed: 'Something went wrong. Please try again.',
+      },
+      de: {
+        title: 'Organisation registrieren',
+        intro: 'Die Registrierung ist kostenlos. Alle Felder sind Pflichtfelder.',
+        organisation: 'Organisation',
+        organisationName: 'Name der Organisation',
+        organisationNumber: 'Firmenbuchnummer',
+        admin: 'Erste:r Organisations-Admin',
+        firstName: 'Vorname',
+        lastName: 'Nachname',
+        email: 'E-Mail-Adresse',
+        register: 'Registrieren',
+        REQUIRED: 'Bitte füllen Sie dieses Feld aus.',
+        TOO_LONG: 'Das ist zu lang (höchstens 200 Zeichen).',
+        INVALID_organisationNumber: 'Bitte geben Sie eine Firmenbuchnummer wie FN 123456a ein.',
+        INVALID_email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+        ORGANISATION_EXISTS: 'Eine Organisation mit dieser Firmenbuchnummer ist bereits registriert.',
+        EMAIL_IN_USE: 'Diese E-Mail-Adresse wird bereits von einem anderen Konto verwendet.',
+        done: 'Ihre Organisation ist registriert. Wählen Sie jetzt ein Passwort. Danach senden wir Ihnen eine E-Mail mit einem Link, um Ihre Adresse zu bestätigen.',
+        failed: 'Etwas ist schiefgegangen. Bitte versuchen Sie es erneut.',
+      },
+    };
+    const lang = navigator.language.toLowerCase().startsWith('de') ? 'de' : 'en';
+    const t = texts[lang];
+    document.documentElement.lang = lang;
+    document.title = `BizPartnerCheck – ${t.title}`;
+    for (const [id, key] of [['title', 'title'], ['intro', 'intro'], ['organisation-legend', 'organisation'],
+      ['admin-legend', 'admin'], ['register-button', 'register'],
+      ...['organisationName', 'organisationNumber', 'firstName', 'lastName', 'email'].map((name) => [`${name}-label`, name])]) {
+      document.getElementById(id).textContent = t[key];
+    }
+
+    const form = document.getElementById('register-form');
+    const message = document.getElementById('message');
+    const showFieldErrors = (fields = {}) => {
+      for (const slot of document.querySelectorAll('[data-error-for]')) {
+        const code = fields[slot.dataset.errorFor];
+        slot.textContent = code ? (t[`${code}_${slot.dataset.errorFor}`] ?? t[code]) : '';
+      }
+    };
+
+    // The link in Clerk's verification e-mail comes back to this page with
+    // __clerk_status in the URL. Let Clerk finish the sign-up, then go to the app.
+    if (new URLSearchParams(location.search).has('__clerk_status')) {
+      form.hidden = true;
+      loadClerk()
+        .then((clerk) => clerk.handleEmailLinkVerification({
+          redirectUrlComplete: '/app/',
+          redirectUrl: '/app/',
+          onVerifiedOnOtherDevice: () => location.replace('/login'),
+        }))
+        .catch(() => { message.textContent = t.failed; });
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      showFieldErrors();
+      const body = Object.fromEntries(new FormData(form));
+      const response = await fetch('/api/organisations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => null);
+      if (response?.status === 201) {
+        form.hidden = true;
+        message.textContent = t.done;
+        const clerk = await loadClerk().catch(() => null);
+        if (!clerk) {
+          message.textContent = t.failed;
+          return;
+        }
+        clerk.mountSignUp(document.getElementById('sign-up'), {
+          initialValues: { emailAddress: body.email },
+          signInUrl: '/login',
+          forceRedirectUrl: '/app/',
+        });
+        return;
+      }
+      const result = await response?.json().catch(() => ({}));
+      if (result?.fields) showFieldErrors(result.fields);
+      else message.textContent = t[result?.error] ?? t.failed;
+    });
+  </script>
+</body>
+</html>

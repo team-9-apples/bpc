@@ -19,13 +19,12 @@ SUPER_ADMIN_EMAIL=ops@example.com npm run setup -- --remote
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `SUPER_ADMIN_EMAIL` | yes | E-mail address of the Super Admin |
-| `SUPER_ADMIN_PASSWORD` | no | Initial password, at least 12 characters. If unset, a random one is generated and printed once. |
 | `D1_DATABASE` | no | D1 database name, default `bpc` |
 
 What the script does:
 
 1. Applies all migrations in `migrations/` that have not run yet.
-2. Creates the Super Admin with a hashed password, marked so the password must be changed at first login (assumption for OI-08).
+2. Creates the Super Admin, without a password. The Super Admin then creates the Clerk account with the same e-mail address on `/signup`; the first sign-in links the two (see Login).
 
 Running it again is safe: already applied migrations are skipped, and if a Super Admin exists it prints its e-mail and creates nothing.
 The database also refuses a second Super Admin through a unique index.
@@ -49,17 +48,31 @@ First deployment on a new Cloudflare account:
 
 1. `npx wrangler d1 create bpc --location weur` and put the printed `database_id` in `wrangler.toml`.
 2. `SUPER_ADMIN_EMAIL=... npm run setup -- --remote` to create the schema and the Super Admin.
-3. `npm run deploy`. Wrangler creates the custom domain and its TLS certificate. The zone (`hsynrsd.dev`) must be on the same Cloudflare account.
+3. `npx wrangler secret put CLERK_SECRET_KEY` with the secret key of the Clerk instance (see Login).
+4. `npm run deploy`. Wrangler creates the custom domain and its TLS certificate. The zone (`hsynrsd.dev`) must be on the same Cloudflare account.
 
-## Password reset
+## Organisation registration
 
-SCRUM-15: users who forgot their password open `/reset-password.html`, enter their e-mail address and get a link that works once for 30 minutes.
+SCRUM-12 (FR-ORG-01): a new organisation registers for free on `/register` with its name, its company register number (Firmenbuchnummer) and the first name, last name and e-mail address of its first Organisation Admin.
 
-- `POST /api/password-reset` `{ "email" }` always answers 202, so it does not reveal which addresses have an account. At most 3 links per user per hour.
-- `POST /api/password-reset/confirm` `{ "token", "password" }` answers 204, or 400 with `INVALID_LINK`, `PASSWORD_TOO_SHORT` or `PASSWORD_TOO_LONG`.
-- Apply the new table with `npx wrangler d1 migrations apply bpc --remote` (or `npm run setup -- --remote`).
-- Set the mail provider with `npx wrangler secret put RESEND_API_KEY` and `npx wrangler secret put MAIL_FROM`. Without them no mail is sent, and the failure is logged without the link.
-- For local development without a provider, `cp .dev.vars.example .dev.vars`: with `ENVIRONMENT=development`, `npm run dev` prints the mails, including the link, to the terminal.
+- `POST /api/organisations` `{ "organisationName", "organisationNumber", "firstName", "lastName", "email" }` answers 201 `{ "organisationId" }`, 400 `INVALID_INPUT` with an error code per field, or 409 `ORGANISATION_EXISTS` / `EMAIL_IN_USE`.
+- The number is accepted as `FN 123456a`, `123456a` or `fn 123456 A` and stored as `FN 123456a`.
+- The admin is created as `ADMIN` with status `PENDING`. Right after registering, the page shows Clerk's sign-up with the same e-mail address; once Clerk has verified the address, the first sign-in activates the admin (see Login).
+
+## Login (Clerk)
+
+SCRUM-104 (SI-06, CR-09): the team does not implement authentication itself. Sign-in, sign-up, e-mail verification (with a code) and password reset are handled by **Clerk**; the database holds no passwords (QS-SEC-02).
+
+**Why Clerk:** it runs with Cloudflare Workers (`@clerk/backend` verifies sessions in the Worker, the browser part loads from Clerk's CDN without a build step), its free plan is far more than enough for this project (50,000 monthly users), and it has ready-made sign-in and sign-up forms with e-mail verification and password reset. EU data location: not checked yet; see open points in the PR.
+
+How it fits together:
+
+- Pages: `/login` (Clerk sign-in), `/register` (organisation registration, then Clerk sign-up), `/signup` (Clerk sign-up for users that already exist here, e.g. the Super Admin), `/app/` (only for signed-in users).
+- The Worker checks the Clerk session on `/api/me` and on every page under `/app/`, and maps the Clerk user to our user, organisation and role (`src/auth.js`). Without a session `/app/` redirects to `/login` and `/api/me` answers 401. A Clerk account that belongs to no user here gets 403 `NOT_REGISTERED` on both (the page says so and offers logout).
+- First sign-in: when Clerk reports the user's primary e-mail address as verified, the user with that address is linked via `users.external_user_id` and set to `ACTIVE` (`linkExternalUser()` in `src/registration.js`). Deactivated users are never linked and lose access at once.
+- Keys: `CLERK_PUBLISHABLE_KEY` is public and set in `wrangler.toml`. `CLERK_SECRET_KEY` is a secret: `npx wrangler secret put CLERK_SECRET_KEY`, and locally in `.dev.vars` (see `.dev.vars.example`). Never commit it.
+- In the Clerk dashboard: sign-in with e-mail address and password only; e-mail verification by **code** (a link opens a new tab and the sign-up was not finished there); user enumeration protection **Strict** (a failed login does not say whether the address exists, SCRUM-14); access mode **Open** (new organisations sign up after registering).
+- Secret keys are shown only once in the Clerk dashboard. Copying the masked key (`sk_test_B••••`) does not work; create a new key and copy it right away.
 
 ## BMF feed (FR-DOC-06)
 
@@ -79,6 +92,23 @@ npx wrangler d1 migrations apply bpc --local   # creates the new tables
 npm run dev
 # in a browser: http://localhost:8787/cdn-cgi/local/scheduled
 npx wrangler d1 execute bpc --local --command "SELECT * FROM bmf_feed_fetches"
+```
+
+## VIES check and proof of concept
+
+The VIES adapter (SCRUM-66, `src/adapters/vies.js`) checks VAT numbers of every EU member state through the European Commission's VIES REST service.
+
+- A valid number is `VALID` with the registered name and address; an invalid one is `INVALID`.
+- A number without an EU prefix is `INVALID` without calling VIES. If VIES or a member state's service is down, the result is `UNAVAILABLE`.
+- `VIES_URL` overrides the endpoint, for example with the VIES test service, where `100` is a valid and `200` an invalid number.
+
+The BMF adapter (SCRUM-19, `src/adapters/bmf.js`) looks the partner up in the last good copy of the BMF list, by VAT number, then by FN: listed is `INVALID` with the listed entry, not listed is `VALID`, and no copy yet is `UNAVAILABLE`. Both answers include when the list was fetched and published.
+
+The Sprint 1 proof of concept (DI-07, SCRUM-25) loads the live BMF feed into a temporary database and runs one check through all adapters:
+
+```sh
+npm run poc -- ATU12345678      # real VIES
+npm run poc -- AT100 --test     # VIES test service
 ```
 
 ## Availability

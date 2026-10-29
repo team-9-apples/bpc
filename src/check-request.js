@@ -2,13 +2,12 @@
 
 // One regex per EU country, keyed by the 2-letter prefix.
 const VAT_FORMATS = {
-  AT: /^ATU\d{8}$/,   // ATU + 8 digits
-  DE: /^DE\d{9}$/,    // DE + 9 digits
+  AT: /^ATU\d{8}$/, // ATU + 8 digits
+  DE: /^DE\d{9}$/, // DE + 9 digits
   // more countries later
 };
 
-
-// Takes whatever the user typed and returns either: { ok: true, vat: 'ATU12345678' }   (cleaned up) or, { ok: false, error: 'INVALID_VAT' }
+// Takes whatever the user typed and returns either: { ok: true, vat: 'ATU12345678' } (cleaned up) or { ok: false, error: 'INVALID_VAT' }
 export function validateVat(input) {
   // if input is not a string, return the error
   if (typeof input !== 'string') {
@@ -34,7 +33,7 @@ export function validateVat(input) {
     return { ok: false, error: 'INVALID_VAT' };
   }
 
-  return { ok: true, vat: cleaned };   // passed everything: success
+  return { ok: true, vat: cleaned }; // passed everything: success
 }
 
 // The FN is optional. Returns { ok: true, fn: '123456a' }, { ok: true, fn: null } when nothing was entered, or { ok: false, error: 'INVALID_FN' }.
@@ -68,7 +67,7 @@ const auditSql = 'INSERT INTO audit_log (created_at, user_id, action, details) V
 
 /**
  * Starts a check request for the given user.
- * user: { id, organisation_id, role } of the logged-in user.
+ * user: the signed-in user from currentUser() in auth.js ({ id, organisationId, role, ... }).
  * input: { vat, fn } exactly as typed.
  *
  * Returns { ok: true, requestId } or { ok: false, error } with error
@@ -104,7 +103,7 @@ export async function startCheck({ db, now = new Date() }, user, input) {
        VALUES (?, ?, ?, ?, 'RUNNING', ?)
        RETURNING id`,
     )
-    .bind(user.organisation_id, user.id, vat.vat, fn.fn, at)
+    .bind(user.organisationId, user.id, vat.vat, fn.fn, at)
     .first();
 
   // 4. Log that a request was started (FR-LOG-03).
