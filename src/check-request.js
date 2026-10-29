@@ -8,7 +8,6 @@ const VAT_FORMATS = {
 };
 
 
-
 // Takes whatever the user typed and returns either: { ok: true, vat: 'ATU12345678' }   (cleaned up) or, { ok: false, error: 'INVALID_VAT' }
 export function validateVat(input) {
   // if input is not a string, return the error
@@ -36,4 +35,27 @@ export function validateVat(input) {
   }
 
   return { ok: true, vat: cleaned };   // passed everything: success
+}
+
+// The FN is optional. Returns { ok: true, fn: '123456a' }, { ok: true, fn: null } when nothing was entered, or { ok: false, error: 'INVALID_FN' }.
+export function validateFn(input) {
+  // nothing entered -> fine, no FN
+  if (input === undefined || input === null || input === '') {
+    return { ok: true, fn: null };
+  }
+
+  // not text -> error
+  if (typeof input !== 'string') {
+    return { ok: false, error: 'INVALID_FN' };
+  }
+
+  // remove spaces, make lowercase (the check letter is lowercase)
+  const cleaned = input.replace(/\s/g, '').toLowerCase();
+
+  // 1 to 6 digits, then one letter
+  if (!/^\d{1,6}[a-z]$/.test(cleaned)) {
+    return { ok: false, error: 'INVALID_FN' };
+  }
+
+  return { ok: true, fn: cleaned };
 }
