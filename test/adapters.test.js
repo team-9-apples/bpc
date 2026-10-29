@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SOURCES, createAdapters, runChecks } from '../src/adapters/index.js';
+import { d1, migratedDatabase } from './d1.js';
 
 const query = { vat: 'ATU12345678', fn: null };
 const mock = (source, check) => ({ source, check });
@@ -22,13 +23,14 @@ test('there is exactly one adapter per source, all with the same interface', () 
 });
 
 test('every source is called through the interface and returns a check_results row', async () => {
-  const results = await runChecks(createAdapters({}, {}, offline), query);
+  const results = await runChecks(createAdapters({ DB: d1(migratedDatabase()) }, {}, offline), query);
   assert.deepEqual(results.map((row) => row.source), SOURCES);
+  // VIES (SCRUM-66) and BMF (SCRUM-19) are implemented; here VIES is offline and
+  // the empty database has no copy of the BMF list yet.
+  const reasons = { VIES: /offline in tests/, BMF: /No copy of the BMF list yet/ };
   for (const row of results) {
     assert.equal(row.state, 'UNAVAILABLE');
-    // VIES is implemented (SCRUM-66); here it fails only because it is offline.
-    const reason = row.source === 'VIES' ? /offline in tests/ : /Not implemented yet \(SCRUM-\d+\)/;
-    assert.match(row.details.reason, reason);
+    assert.match(row.details.reason, reasons[row.source] ?? /Not implemented yet \(SCRUM-\d+\)/);
     assert.ok(!Number.isNaN(Date.parse(row.queriedAt)));
   }
 });
