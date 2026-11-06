@@ -84,3 +84,36 @@ test('a source that answers too late or with an unknown state is UNAVAILABLE', a
     ],
   );
 });
+
+test('a partner outside Austria only runs VIES, the other four are NOT_APPLICABLE', async () => {
+  const called = [];
+  const adapters = SOURCES.map((source) =>
+    mock(source, async () => {
+      called.push(source);
+      return { state: 'VALID', details: null };
+    }),
+  );
+  const results = await runChecks(adapters, { vat: 'DE123456789', fn: null });
+
+  assert.deepEqual(called, ['VIES']);
+  const bySource = Object.fromEntries(results.map((row) => [row.source, row]));
+  assert.equal(bySource.VIES.state, 'VALID');
+  for (const source of ['BMF', 'HFU', 'FIRMENBUCH', 'GISA']) {
+    assert.equal(bySource[source].state, 'NOT_APPLICABLE');
+    assert.deepEqual(bySource[source].details, { note: 'Austrian register only' });
+  }
+});
+
+test('an Austrian partner runs all five checks', async () => {
+  const called = [];
+  const adapters = SOURCES.map((source) =>
+    mock(source, async () => {
+      called.push(source);
+      return { state: 'VALID', details: null };
+    }),
+  );
+  const results = await runChecks(adapters, { vat: 'ATU12345678', fn: null });
+
+  assert.deepEqual(called, SOURCES);
+  assert.ok(results.every((row) => row.state === 'VALID'));
+});

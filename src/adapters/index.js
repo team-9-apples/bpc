@@ -9,11 +9,11 @@ import { createBmfAdapter } from './bmf.js';
 import { createFirmenbuchAdapter } from './firmenbuch.js';
 import { createGisaAdapter } from './gisa.js';
 import { createHfuAdapter } from './hfu.js';
-import { createViesAdapter } from './vies.js';
+import { createViesAdapter, splitVat } from './vies.js';
 
 // Same values as the CHECK constraints on check_results.
 export const SOURCES = ['VIES', 'BMF', 'HFU', 'FIRMENBUCH', 'GISA'];
-export const STATES = ['VALID', 'INVALID', 'NOT_FOUND', 'UNAVAILABLE'];
+export const STATES = ['VALID', 'INVALID', 'NOT_FOUND', 'UNAVAILABLE', 'NOT_APPLICABLE'];
 
 // One adapter per source. QS-PRF-01 allows 15 s for a whole request, so a
 // single source gets less than that.
@@ -56,13 +56,25 @@ async function runOne(adapter, query, timeoutMs) {
 }
 
 // Calls every adapter in parallel and returns one row per source, in the
-// shape of check_results.
+// shape of check_results. For a partner outside Austria only VIES is called;
+// the Austrian sources are NOT_APPLICABLE (FR-CHK-04, CR-10).
 export async function runChecks(adapters, query, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const isAustrian = splitVat(query.vat)?.countryCode === 'AT';
   return Promise.all(
-    adapters.map(async (adapter) => ({
-      source: adapter.source,
-      ...(await runOne(adapter, query, timeoutMs)),
-      queriedAt: new Date().toISOString(),
-    })),
+    adapters.map(async (adapter) => {
+      if (!isAustrian && adapter.source !== 'VIES') {
+        return {
+          source: adapter.source,
+          state: 'NOT_APPLICABLE',
+          details: { note: 'Austrian register only' },
+          queriedAt: new Date().toISOString(),
+        };
+      }
+      return {
+        source: adapter.source,
+        ...(await runOne(adapter, query, timeoutMs)),
+        queriedAt: new Date().toISOString(),
+      };
+    }),
   );
 }
