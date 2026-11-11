@@ -19,6 +19,7 @@ export function d1(sqlite) {
   const statement = (sql, params = []) => ({
     bind: (...values) => statement(sql, values),
     first: async () => sqlite.prepare(sql).get(...params) ?? null,
+    all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
     run: async () => statement(sql, params).execute(),
     execute: () =>
       /\bRETURNING\b/i.test(sql)
