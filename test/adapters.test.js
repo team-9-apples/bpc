@@ -23,7 +23,7 @@ test('there is exactly one adapter per source, all with the same interface', () 
 });
 
 test('every source is called through the interface and returns a check_results row', async () => {
-  const results = await runChecks(createAdapters({ DB: d1(migratedDatabase()) }, {}, offline), query);
+  const results = await runChecks(createAdapters({ DB: d1(migratedDatabase()), VIES_URL: 'https://vies.test/check-vat-number' }, {}, offline), query);
   assert.deepEqual(results.map((row) => row.source), SOURCES);
   // VIES (SCRUM-66) and BMF (SCRUM-19) are implemented; here VIES is offline and
   // the empty database has no copy of the BMF list yet.

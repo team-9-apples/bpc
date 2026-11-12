@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
-import { DEFAULT_BMF_FEED_URL, decodeFeed, parseBmfFeed, parseFeedDate, refreshBmfFeed } from '../src/bmf-feed.js';
+import { decodeFeed, parseBmfFeed, parseFeedDate, refreshBmfFeed } from '../src/bmf-feed.js';
 import worker from '../src/index.js';
 
 
@@ -74,7 +74,8 @@ const at = (iso) => () => new Date(iso);
 
 function setup() {
   const sqlite = databaseWithAllMigrations();
-  return { sqlite, env: { DB: d1(sqlite) } };
+  // DI-04: the real feed address is configuration, so the tests use a made-up one.
+  return { sqlite, env: { DB: d1(sqlite), BMF_FEED_URL: 'https://bmf.test/feed.xml' } };
 }
 
 const fetches = (sqlite) => sqlite.prepare('SELECT * FROM bmf_feed_fetches ORDER BY id').all();
@@ -225,7 +226,7 @@ test('every fetch is written to the audit log and no partner check is started', 
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM requests').get().n, 0);
 });
 
-test('the feed URL comes from BMF_FEED_URL, with the BMF address as default', async () => {
+test('the feed URL comes from BMF_FEED_URL', async () => {
   const { env } = setup();
   const asked = [];
   const record = async (url) => {
@@ -234,7 +235,16 @@ test('the feed URL comes from BMF_FEED_URL, with the BMF address as default', as
   };
   await refreshBmfFeed(env, { fetch: record });
   await refreshBmfFeed({ ...env, BMF_FEED_URL: 'http://localhost:9999/mock.xml' }, { fetch: record });
-  assert.deepEqual(asked, [DEFAULT_BMF_FEED_URL, 'http://localhost:9999/mock.xml']);
+  assert.deepEqual(asked, ['https://bmf.test/feed.xml', 'http://localhost:9999/mock.xml']);
+});
+
+test('without BMF_FEED_URL nothing is fetched and the run is logged as FAILED', async () => {
+  const { sqlite, env } = setup();
+  let called = false;
+  const result = await refreshBmfFeed({ DB: env.DB }, { fetch: async () => { called = true; } });
+  assert.equal(called, false);
+  assert.equal(result.status, 'FAILED');
+  assert.match(fetches(sqlite)[0].error, /BMF_FEED_URL is not configured/);
 });
 
 // ------------------------------------------------------------------ the schedule

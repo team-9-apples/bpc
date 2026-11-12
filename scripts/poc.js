@@ -9,7 +9,13 @@ import { refreshBmfFeed } from '../src/bmf-feed.js';
 import { createAdapters, runChecks } from '../src/adapters/index.js';
 import { d1, migratedDatabase } from '../test/d1.js';
 
-const VIES_TEST_URL = 'https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-test-service';
+// DI-04 / SCRUM-88: the source URLs come from .dev.vars (see .dev.vars.example)
+// or from the shell environment.
+try {
+  process.loadEnvFile('.dev.vars');
+} catch {
+  // No .dev.vars: use the shell environment only.
+}
 
 const args = process.argv.slice(2);
 const testMode = args.includes('--test');
@@ -19,7 +25,16 @@ if (!vat) {
   process.exit(1);
 }
 
-const env = { DB: d1(migratedDatabase()), ...(testMode ? { VIES_URL: VIES_TEST_URL } : {}) };
+const viesUrl = testMode ? process.env.VIES_TEST_URL : process.env.VIES_URL;
+const missing = [[testMode ? 'VIES_TEST_URL' : 'VIES_URL', viesUrl], ['BMF_FEED_URL', process.env.BMF_FEED_URL]]
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+if (missing.length) {
+  console.error(`Missing ${missing.join(', ')}. Copy .dev.vars.example to .dev.vars.`);
+  process.exit(1);
+}
+
+const env = { DB: d1(migratedDatabase()), VIES_URL: viesUrl, BMF_FEED_URL: process.env.BMF_FEED_URL };
 
 console.log('\nBMF fake company list (live feed)\n');
 const feed = await refreshBmfFeed(env);

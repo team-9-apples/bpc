@@ -16,6 +16,7 @@ function addScript(src, attributes = {}) {
 
 window.loadClerk = async function loadClerk() {
   const { clerkPublishableKey: key } = await fetch('/api/config').then((response) => response.json());
+  if (!key) throw new Error('Sign-in is not configured: CLERK_PUBLISHABLE_KEY is missing on the server');
   // The publishable key encodes Clerk's frontend API host: pk_test_<base64 "host$">.
   const host = atob(key.split('_')[2]).replace(/\$$/, '');
   await addScript(`https://${host}/npm/@clerk/ui@1/dist/ui.browser.js`);

@@ -48,8 +48,24 @@ First deployment on a new Cloudflare account:
 
 1. `npx wrangler d1 create bpc --location weur` and put the printed `database_id` in `wrangler.toml`.
 2. `SUPER_ADMIN_EMAIL=... npm run setup -- --remote` to create the schema and the Super Admin.
-3. `npx wrangler secret put CLERK_SECRET_KEY` with the secret key of the Clerk instance (see Login).
+3. Set the configuration as Wrangler secrets (see Configuration below): `npx wrangler secret put <NAME>` for `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VIES_URL` and `BMF_FEED_URL`.
 4. `npm run deploy`. Wrangler creates the custom domain and its TLS certificate. The zone (`hsynrsd.dev`) must be on the same Cloudflare account.
+
+## Configuration
+
+DI-04 (SCRUM-88): source URLs, keys and passwords are not in the code or in `wrangler.toml`. The Worker reads them from environment variables:
+
+| Variable | Used for |
+| --- | --- |
+| `CLERK_PUBLISHABLE_KEY` | Clerk sign-in in the browser (see Login) |
+| `CLERK_SECRET_KEY` | Clerk session checks in the Worker (see Login) |
+| `VIES_URL` | VIES REST endpoint (see VIES check) |
+| `BMF_FEED_URL` | BMF fake company feed (see BMF feed) |
+
+- Locally: copy `.dev.vars.example` to `.dev.vars`. It already holds the public source URLs; add the Clerk keys. `.dev.vars` is in `.gitignore`. `npm run dev` and `npm run poc` read it.
+- On Cloudflare: `npx wrangler secret put <NAME>` for each variable. Secrets stay set across deploys.
+- A missing value does not crash the Worker: without `VIES_URL` the VIES result is `UNAVAILABLE`, without `BMF_FEED_URL` the daily fetch is logged as `FAILED`, and without the Clerk keys sign-in does not work.
+- `test/config.test.js` fails if a URL or key is written into `src/`, `scripts/` or `wrangler.toml`.
 
 ## Organisation registration
 
@@ -70,7 +86,7 @@ How it fits together:
 - Pages: `/login` (Clerk sign-in), `/register` (organisation registration, then Clerk sign-up), `/signup` (Clerk sign-up for users that already exist here, e.g. the Super Admin), `/app/` (only for signed-in users).
 - The Worker checks the Clerk session on `/api/me` and on every page under `/app/`, and maps the Clerk user to our user, organisation and role (`src/auth.js`). Without a session `/app/` redirects to `/login` and `/api/me` answers 401. A Clerk account that belongs to no user here gets 403 `NOT_REGISTERED` on both (the page says so and offers logout).
 - First sign-in: when Clerk reports the user's primary e-mail address as verified, the user with that address is linked via `users.external_user_id` and set to `ACTIVE` (`linkExternalUser()` in `src/registration.js`). Deactivated users are never linked and lose access at once.
-- Keys: `CLERK_PUBLISHABLE_KEY` is public and set in `wrangler.toml`. `CLERK_SECRET_KEY` is a secret: `npx wrangler secret put CLERK_SECRET_KEY`, and locally in `.dev.vars` (see `.dev.vars.example`). Never commit it.
+- Keys: `CLERK_PUBLISHABLE_KEY` (public by design) and `CLERK_SECRET_KEY` are both set with `npx wrangler secret put`, and locally in `.dev.vars` (see Configuration). Never commit them.
 - In the Clerk dashboard: sign-in with e-mail address and password only; e-mail verification by **code** (a link opens a new tab and the sign-up was not finished there); user enumeration protection **Strict** (a failed login does not say whether the address exists, SCRUM-14); access mode **Open** (new organisations sign up after registering).
 - Secret keys are shown only once in the Clerk dashboard. Copying the masked key (`sk_test_B••••`) does not work; create a new key and copy it right away.
 
@@ -99,7 +115,7 @@ Once a day at 04:17 UTC (05:17 Vienna time in winter) a Cron Trigger runs the Wo
 - A failed run (no answer within 30 s, an HTTP error, or a broken, empty or incomplete feed) is logged with its error, and the last good copy stays in use.
 - Every run is also written to `audit_log` as `BMF_FEED_FETCH`. The job never starts a partner check (FR-CHK-09).
 
-The feed URL defaults to `https://service.bmf.gv.at/service/allg/lsu/rss_lsu.asp` and can be overridden with the `BMF_FEED_URL` variable, for example to point at a mock.
+The feed URL comes from the `BMF_FEED_URL` variable (see Configuration), so it can also point at a mock.
 
 Run the job locally without waiting for the schedule:
 
@@ -116,7 +132,7 @@ The VIES adapter (SCRUM-66, `src/adapters/vies.js`) checks VAT numbers of every 
 
 - A valid number is `VALID` with the registered name and address; an invalid one is `INVALID`.
 - A number without an EU prefix is `INVALID` without calling VIES. If VIES or a member state's service is down, the result is `UNAVAILABLE`.
-- `VIES_URL` overrides the endpoint, for example with the VIES test service, where `100` is a valid and `200` an invalid number.
+- The endpoint comes from the `VIES_URL` variable (see Configuration). It can point at the VIES test service (`VIES_TEST_URL` in `.dev.vars.example`), where `100` is a valid and `200` an invalid number.
 
 The BMF adapter (SCRUM-19, `src/adapters/bmf.js`) looks the partner up in the last good copy of the BMF list, by VAT number, then by FN: listed is `INVALID` with the listed entry, not listed is `VALID`, and no copy yet is `UNAVAILABLE`. Both answers include when the list was fetched and published.
 
@@ -126,6 +142,8 @@ The Sprint 1 proof of concept (DI-07, SCRUM-25) loads the live BMF feed into a t
 npm run poc -- ATU12345678      # real VIES
 npm run poc -- AT100 --test     # VIES test service
 ```
+
+It reads `VIES_URL` (or `VIES_TEST_URL` with `--test`) and `BMF_FEED_URL` from `.dev.vars`.
 
 ## Availability
 
