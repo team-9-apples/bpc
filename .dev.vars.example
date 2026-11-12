@@ -1,3 +1,15 @@
-# Local settings for `npm run dev`. Copy to .dev.vars (not committed).
-# Clerk secret key from the Clerk dashboard (API keys). Never commit it.
+# DI-04 / SCRUM-88: all configuration lives outside the code. Copy this file to
+# .dev.vars (not committed) for `npm run dev` and `npm run poc`. On Cloudflare,
+# set each value with `npx wrangler secret put <NAME>`.
+
+# Clerk keys from the Clerk dashboard (API keys). Never commit the secret key.
+CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+
+# VIES REST service of the European Commission (SI-01).
+VIES_URL=https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number
+# VIES test service, used by `npm run poc -- AT100 --test` (100 = valid, 200 = invalid).
+VIES_TEST_URL=https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-test-service
+
+# BMF fake company feed, Liste der Scheinunternehmen (FR-DOC-06).
+BMF_FEED_URL=https://service.bmf.gv.at/service/allg/lsu/rss_lsu.asp

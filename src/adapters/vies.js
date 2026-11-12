@@ -1,8 +1,8 @@
 // SI-01 / SCRUM-66: VIES (EU VAT check) adapter for every EU member state (FR-CHK-03).
 // VIES reports errors in the body with HTTP 200, so the body decides the result.
 
-// VIES_URL overrides it, e.g. with the VIES test service (100 = valid, 200 = invalid).
-export const DEFAULT_VIES_URL = 'https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number';
+// DI-04 / SCRUM-88: the endpoint comes from the VIES_URL variable, not from the
+// code (see .dev.vars.example). Without it the check reports UNAVAILABLE.
 
 const TIMEOUT_MS = 10_000;
 
@@ -37,13 +37,14 @@ export function createViesAdapter(env, { fetch = globalThis.fetch } = {}) {
         return { state: 'INVALID', details: { reason: 'Not an EU VAT number', vat: vat ?? null } };
       }
 
-      const response = await fetch(env.VIES_URL || DEFAULT_VIES_URL, {
+      // runChecks turns a thrown error into UNAVAILABLE.
+      if (!env.VIES_URL) throw new Error('VIES_URL is not configured');
+      const response = await fetch(env.VIES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(parts),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      // runChecks turns a thrown error into UNAVAILABLE.
       if (!response.ok) throw new Error(`VIES answered HTTP ${response.status}`);
       const body = await response.json();
 

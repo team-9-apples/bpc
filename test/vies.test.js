@@ -5,7 +5,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_VIES_URL, createViesAdapter, splitVat } from '../src/adapters/vies.js';
+import { createViesAdapter, splitVat } from '../src/adapters/vies.js';
+
+// DI-04: the real endpoint is configuration, so the tests use a made-up one.
+const env = { VIES_URL: 'https://vies.test/check-vat-number' };
 
 // A fetch that answers with `body` and records every request it gets.
 function fakeVies(body, status = 200) {
@@ -41,7 +44,7 @@ test('a valid number is VALID with the registered name and address', async () =>
     name: 'Beispiel Bau GmbH',
     address: 'Hauptstraße 1\n3500 Krems',
   });
-  const result = await createViesAdapter({}, vies).check({ vat: 'ATU12345678', fn: null });
+  const result = await createViesAdapter(env, vies).check({ vat: 'ATU12345678', fn: null });
 
   assert.deepEqual(result, {
     state: 'VALID',
@@ -53,7 +56,7 @@ test('a valid number is VALID with the registered name and address', async () =>
     },
   });
   assert.equal(vies.calls.length, 1);
-  assert.equal(vies.calls[0].url, DEFAULT_VIES_URL);
+  assert.equal(vies.calls[0].url, env.VIES_URL);
   assert.equal(vies.calls[0].init.method, 'POST');
   assert.deepEqual(vies.calls[0].body, { countryCode: 'AT', vatNumber: 'U12345678' });
 });
@@ -61,7 +64,7 @@ test('a valid number is VALID with the registered name and address', async () =>
 test('numbers from other member states are sent with their own country code', async () => {
   for (const [vat, countryCode] of [['DE123456789', 'DE'], ['FR12345678901', 'FR'], ['EL123456789', 'EL']]) {
     const vies = fakeVies({ countryCode, vatNumber: vat.slice(2), valid: true, name: 'X', address: 'Y' });
-    const result = await createViesAdapter({}, vies).check({ vat });
+    const result = await createViesAdapter(env, vies).check({ vat });
     assert.equal(result.state, 'VALID');
     assert.equal(vies.calls[0].body.countryCode, countryCode);
   }
@@ -76,13 +79,13 @@ test('an invalid number is INVALID, and "---" placeholders are not shown as data
     name: '---',
     address: '---',
   });
-  const result = await createViesAdapter({}, vies).check({ vat: 'ATU99999999' });
+  const result = await createViesAdapter(env, vies).check({ vat: 'ATU99999999' });
   assert.deepEqual(result, { state: 'INVALID', details: { vat: 'ATU99999999', requestDate: '2026-10-28T19:34:11.645Z' } });
 });
 
 test('a valid number without a published name keeps name and address empty', async () => {
   const vies = fakeVies({ countryCode: 'DE', vatNumber: '123456789', valid: true, name: '---', address: '---' });
-  const result = await createViesAdapter({}, vies).check({ vat: 'DE123456789' });
+  const result = await createViesAdapter(env, vies).check({ vat: 'DE123456789' });
   assert.equal(result.state, 'VALID');
   assert.equal(result.details.name, null);
   assert.equal(result.details.address, null);
@@ -90,29 +93,35 @@ test('a valid number without a published name keeps name and address empty', asy
 
 test('a non-EU number is INVALID without calling VIES', async () => {
   const vies = fakeVies({});
-  const result = await createViesAdapter({}, vies).check({ vat: 'CHE123456789' });
+  const result = await createViesAdapter(env, vies).check({ vat: 'CHE123456789' });
   assert.deepEqual(result, { state: 'INVALID', details: { reason: 'Not an EU VAT number', vat: 'CHE123456789' } });
   assert.equal(vies.calls.length, 0);
 });
 
 test('VIES rejecting the format is INVALID; any other VIES error is UNAVAILABLE', async () => {
   const rejected = fakeVies({ actionSucceed: false, errorWrappers: [{ error: 'INVALID_INPUT' }] });
-  assert.deepEqual(await createViesAdapter({}, rejected).check({ vat: 'ATU1' }), {
+  assert.deepEqual(await createViesAdapter(env, rejected).check({ vat: 'ATU1' }), {
     state: 'INVALID',
     details: { reason: 'VIES rejected the VAT number format', error: 'INVALID_INPUT' },
   });
 
   for (const error of ['MS_UNAVAILABLE', 'TIMEOUT', 'MS_MAX_CONCURRENT_REQ', 'SERVICE_UNAVAILABLE']) {
     const busy = fakeVies({ actionSucceed: false, errorWrappers: [{ error }] });
-    const result = await createViesAdapter({}, busy).check({ vat: 'ATU12345678' });
+    const result = await createViesAdapter(env, busy).check({ vat: 'ATU12345678' });
     assert.equal(result.state, 'UNAVAILABLE');
     assert.equal(result.details.error, error);
   }
 });
 
 test('an HTTP error or an answer without "valid" is thrown, so runChecks reports UNAVAILABLE', async () => {
-  await assert.rejects(createViesAdapter({}, fakeVies('<html>down</html>', 503)).check({ vat: 'ATU12345678' }), /HTTP 503/);
-  await assert.rejects(createViesAdapter({}, fakeVies({ countryCode: 'AT' })).check({ vat: 'ATU12345678' }), /no "valid" field/);
+  await assert.rejects(createViesAdapter(env, fakeVies('<html>down</html>', 503)).check({ vat: 'ATU12345678' }), /HTTP 503/);
+  await assert.rejects(createViesAdapter(env, fakeVies({ countryCode: 'AT' })).check({ vat: 'ATU12345678' }), /no "valid" field/);
+});
+
+test('without VIES_URL the adapter calls nothing and throws, so runChecks reports UNAVAILABLE', async () => {
+  const vies = fakeVies({ valid: true });
+  await assert.rejects(createViesAdapter({}, vies).check({ vat: 'ATU12345678' }), /VIES_URL is not configured/);
+  assert.equal(vies.calls.length, 0);
 });
 
 test('VIES_URL points the adapter at another endpoint, e.g. the VIES test service', async () => {

@@ -5,9 +5,8 @@
 // The feed is RSS 2.0 encoded in ISO-8859-1. BMF writes its dates without a time
 // of day (e.g. "27 Oct 2026"), so the publication "time" is stored as a date.
 
-// Default source. BMF_FEED_URL overrides it (for example to point at a mock);
-// moving all source configuration out of the repository is DI-04 / SCRUM-88.
-export const DEFAULT_BMF_FEED_URL = 'https://service.bmf.gv.at/service/allg/lsu/rss_lsu.asp';
+// DI-04 / SCRUM-88: the feed address comes from the BMF_FEED_URL variable, not
+// from the code (see .dev.vars.example). Without it the run is logged as FAILED.
 
 const TIMEOUT_MS = 30_000;
 
@@ -150,7 +149,8 @@ export async function refreshBmfFeed(env, { fetch = globalThis.fetch, now = () =
 
   let feed;
   try {
-    const response = await fetch(env.BMF_FEED_URL || DEFAULT_BMF_FEED_URL, {
+    if (!env.BMF_FEED_URL) throw new Error('BMF_FEED_URL is not configured');
+    const response = await fetch(env.BMF_FEED_URL, {
       headers: { Accept: 'application/rss+xml, application/xml, text/xml' },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
