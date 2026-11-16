@@ -37,7 +37,7 @@ test('no source URLs, keys or passwords in the code or wrangler.toml', () => {
 
 test('.dev.vars.example names every setting, and .dev.vars stays out of Git', () => {
   const example = readFileSync(new URL('.dev.vars.example', root), 'utf8');
-  for (const name of ['CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY', 'VIES_URL', 'BMF_FEED_URL']) {
+  for (const name of ['CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY', 'VIES_URL', 'BMF_FEED_URL', 'HFU_URL', 'HFU_REQUESTER_UID']) {
     assert.match(example, new RegExp(`^${name}=`, 'm'), `${name} is missing in .dev.vars.example`);
   }
   assert.doesNotMatch(example, /[ps]k_(test|live)_[A-Za-z0-9]{8,}/, 'no real Clerk key in the example');

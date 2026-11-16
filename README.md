@@ -61,10 +61,12 @@ DI-04 (SCRUM-88): source URLs, keys and passwords are not in the code or in `wra
 | `CLERK_SECRET_KEY` | Clerk session checks in the Worker (see Login) |
 | `VIES_URL` | VIES REST endpoint (see VIES check) |
 | `BMF_FEED_URL` | BMF fake company feed (see BMF feed) |
+| `HFU_URL` | ÖGK AGH web service for the HFU list (see HFU check) |
+| `HFU_REQUESTER_UID` | UID sent as the asking party (`uidAuftraggeber`) with every HFU query |
 
 - Locally: copy `.dev.vars.example` to `.dev.vars`. It already holds the public source URLs; add the Clerk keys. `.dev.vars` is in `.gitignore`. `npm run dev` and `npm run poc` read it.
 - On Cloudflare: `npx wrangler secret put <NAME>` for each variable. Secrets stay set across deploys.
-- A missing value does not crash the Worker: without `VIES_URL` the VIES result is `UNAVAILABLE`, without `BMF_FEED_URL` the daily fetch is logged as `FAILED`, and without the Clerk keys sign-in does not work.
+- A missing value does not crash the Worker: without `VIES_URL` the VIES result is `UNAVAILABLE`, without `HFU_URL` or `HFU_REQUESTER_UID` the HFU result is `UNAVAILABLE`, without `BMF_FEED_URL` the daily fetch is logged as `FAILED`, and without the Clerk keys sign-in does not work.
 - `test/config.test.js` fails if a URL or key is written into `src/`, `scripts/` or `wrangler.toml`.
 
 ## Organisation registration
@@ -151,6 +153,14 @@ The VIES adapter (SCRUM-66, `src/adapters/vies.js`) checks VAT numbers of every 
 - The endpoint comes from the `VIES_URL` variable (see Configuration). It can point at the VIES test service (`VIES_TEST_URL` in `.dev.vars.example`), where `100` is a valid and `200` an invalid number.
 
 The BMF adapter (SCRUM-19, `src/adapters/bmf.js`) looks the partner up in the last good copy of the BMF list, by VAT number, then by FN: listed is `INVALID` with the listed entry, not listed is `VALID`, and no copy yet is `UNAVAILABLE`. Both answers include when the list was fetched and published.
+
+The HFU adapter (SCRUM-67, `src/adapters/hfu.js`) asks the AGH web service of the Dachverband (HFU-Abfrage extern 3.0, SOAP) whether the partner is on the HFU-Gesamtliste today (Stichtag = today in Vienna), by UID only (OI-03).
+
+- On the list as employer (§ 67b ASVG) or as one-person company (§ 67e ASVG) is `VALID`; `details.listedAs` says which.
+- Not on the list is `NOT_FOUND` with `reason: "not on the HFU list"`. That is information, not a failed check: most companies are not on the list. A non-Austrian UID is `NOT_FOUND` without calling the service.
+- Service down, SOAP fault or an answer we do not understand is `UNAVAILABLE`.
+- The service needs the asking party's UID (`HFU_REQUESTER_UID`), which the ÖGK logs. Whose UID that should be is still open with the customer.
+- The service rejects requests with a `SOAPAction` header, so none is sent. `HFU_URL` can point at the ÖGK test system (`agh-ws-tt`, see `.dev.vars.example`), which answers fixed test data.
 
 The Sprint 1 proof of concept (DI-07, SCRUM-25) loads the live BMF feed into a temporary database and runs one check through all adapters:
 
