@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BizPartnerCheck – Start a check</title>
+  <script src="/clerk.js"></script>
+  <script src="/app-shell.js"></script>
 </head>
 <body>
+  <!-- SCRUM-32: only Request Users and Organisation Admins get this page (src/pages.js). -->
+  <header id="app-header"></header>
   <h1>Start a partner check</h1>
   <form id="check-form">
     <label>VAT number <input name="vat" required placeholder="ATU12345678"></label><br>
@@ -15,6 +19,8 @@
   <p id="message" role="status"></p>
 
   <script>
+    appShell.start();
+
     // SCRUM-16: sends the form to POST /api/requests and shows the result.
     const messages = {
       INVALID_VAT: 'This is not a valid EU VAT number.',

@@ -8,6 +8,7 @@ import { refreshBmfFeed } from './bmf-feed.js';
 import { createAdapters } from './adapters/index.js';
 import { getRequestRecord, runAndSaveChecks, startCheck } from './check-request.js';
 import { languageOf } from './language.js';
+import { mayOpen, pagesFor } from './pages.js';
 import { registerOrganisation } from './registration.js';
 import { getToken, getUser, listRequests, listTokens, listUsers, parseId } from './tenant.js';
 
@@ -72,11 +73,21 @@ function unauthorized({ status, error }) {
 
 async function me(request, env) {
   const caller = await apiCaller(request, env);
-  return caller.user ? json({ user: caller.user }) : unauthorized(caller);
+  // SCRUM-32: pages = the menu entries this user's role may open (src/pages.js).
+  return caller.user ? json({ user: caller.user, pages: pagesFor(caller.user.role) }) : unauthorized(caller);
+}
+
+// no-store keeps the browser from showing a page again after logout.
+async function servePage(env, request, status) {
+  const page = await env.ASSETS.fetch(request);
+  const response = new Response(page.body, { status: status ?? page.status, headers: page.headers });
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
 }
 
 // Pages under /app/ are only for signed-in users; everyone else is sent to the
-// sign-in page. no-store keeps the browser from showing them again after logout.
+// sign-in page. SCRUM-32 / UI-05: each page is also only served to the roles
+// allowed to use it, so typing its URL does not get around the menu.
 async function appPage(request, env) {
   const result = await currentUser({ db: env.DB, identity: identityOf(env) }, request);
   if (result.handshake) return new Response(null, { status: 307, headers: result.handshake });
@@ -84,10 +95,13 @@ async function appPage(request, env) {
   // Signed in to Clerk but not a user here: show the start page, which says so and
   // offers logout. Redirecting to /login would loop, because /login sends anyone
   // with a Clerk session back to /app/.
-  const page = await env.ASSETS.fetch(result.user ? request : new Request(new URL('/app/', request.url), request));
-  const response = new Response(page.body, { status: result.user ? page.status : 403, headers: page.headers });
-  response.headers.set('Cache-Control', 'no-store');
-  return response;
+  if (!result.user) return servePage(env, new Request(new URL('/app/', request.url), request), 403);
+
+  const allowed = mayOpen(result.user.role, new URL(request.url).pathname);
+  if (allowed === null) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  // Not for this role: back to the start page, which says so and shows the pages it may use.
+  if (!allowed) return Response.redirect(new URL('/app/?forbidden', request.url), 302);
+  return servePage(env, request);
 }
 
 // SCRUM-16: POST /api/requests { vat, fn } -> 202 { requestId }

@@ -64,6 +64,12 @@ test('first sign-in with a verified address links the registered admin and activ
   assert.equal(me.status, 200);
   assert.deepEqual(await me.json(), {
     user: { id: 1, email: 'ana@bau.example', firstName: 'Ana', lastName: 'Berger', role: 'ADMIN', organisationId: 1 },
+    pages: [
+      { name: 'start-check', path: '/app/start-check.html' },
+      { name: 'requests', path: '/app/requests.html' },
+      { name: 'users', path: '/app/users.html' },
+      { name: 'tokens', path: '/app/tokens.html' },
+    ],
   });
   assert.deepEqual({ ...userRow() }, { status: 'ACTIVE', external_user_id: 'user_ana' });
 });

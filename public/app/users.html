@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BizPartnerCheck – Users</title>
+  <script src="/clerk.js"></script>
+  <script src="/app-shell.js"></script>
+</head>
+<body>
+  <!-- SCRUM-32: only Organisation Admins get this page (src/pages.js).
+       Shows GET /api/users, which only returns the caller's own organisation. -->
+  <header id="app-header"></header>
+  <main>
+    <h1 id="title"></h1>
+    <div id="content"></div>
+  </main>
+
+  <script>
+    const { t, start, showList } = appShell;
+    document.getElementById('title').textContent = t.pages['users'];
+    start();
+    showList(document.getElementById('content'), '/api/users', 'users', null);
+  </script>
+</body>
+</html>
