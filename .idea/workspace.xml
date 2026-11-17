@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="0679fca3-f380-49b6-ac5e-a6920279ba2b" name="Changes" comment="it is finnaly now working correctly" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="JavaScript File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;patches-of-violet&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/team-9-apples/bpc.git&quot;,
+    &quot;accountId&quot;: &quot;ae26e761-24a2-4c2b-8834-5c845e1bcd04&quot;
+  }
+}</component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0133638975508408" />
+      <entry key="MS500" value="1.716954883469835" />
+      <entry key="S2" value="4.470695672662744" />
+      <entry key="S5" value="7.435690665720332" />
+      <entry key="S10" value="9.301266809634555" />
+      <entry key="S30" value="11.212220930233187" />
+      <entry key="S60" value="12.83732071533764" />
+      <entry key="M2" value="15.94119423117998" />
+      <entry key="M5" value="24.232520094574994" />
+      <entry key="M10" value="38.26248438019839" />
+      <entry key="M15" value="53.3808048220708" />
+      <entry key="M30" value="98.78319621346745" />
+      <entry key="H1" value="166.34495344433262" />
+      <entry key="H2" value="238.40644698566445" />
+      <entry key="H4" value="310.51660922434377" />
+      <entry key="D1" value="453.1919401328906" />
+      <entry key="W1" value="496.82790594647304" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="3.196593319005463E-76" />
+      <entry key="S2" value="1.3371245013676077E-19" />
+      <entry key="S5" value="2.8214662210529764E-8" />
+      <entry key="S10" value="1.6887453242925052E-4" />
+      <entry key="S30" value="0.08056338624410878" />
+      <entry key="S60" value="0.6578439884940395" />
+      <entry key="M2" value="2.6446765023323366" />
+      <entry key="M5" value="8.61260397053433" />
+      <entry key="M10" value="15.840593551705588" />
+      <entry key="M15" value="21.277969367118665" />
+      <entry key="M30" value="32.81216344931387" />
+      <entry key="H1" value="45.492856931544544" />
+      <entry key="H2" value="56.43486298847812" />
+      <entry key="H4" value="65.24313911356137" />
+      <entry key="D1" value="79.32633542615253" />
+      <entry key="W1" value="83.27109885965373" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.9857420043603051" />
+      <entry key="MS500" value="1.7076340074557115" />
+      <entry key="S2" value="4.46404464991657" />
+      <entry key="S5" value="7.431136413409317" />
+      <entry key="S10" value="9.298481946308435" />
+      <entry key="S30" value="11.281327920739558" />
+      <entry key="S60" value="13.466804909414776" />
+      <entry key="M2" value="18.546486346160876" />
+      <entry key="M5" value="32.80384582791974" />
+      <entry key="M10" value="54.060876321164045" />
+      <entry key="M15" value="74.61545904126818" />
+      <entry key="M30" value="131.5539000893459" />
+      <entry key="H1" value="211.80502055304922" />
+      <entry key="H2" value="294.81915293138286" />
+      <entry key="H4" value="375.74585841919543" />
+      <entry key="D1" value="532.5150454087958" />
+      <entry key="W1" value="580.0985037681379" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="3M6HmKNcDcl7A1hJuu3BZKhmvcS" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Node.js Test Runner.grabber work.executor": "Run",
+    "Node.js Test Runner.registration.test.js.executor": "Run",
+    "Node.js Test Runner.the registration is audited with a UTC timestamp.executor": "Run",
+    "Node.js.d1.js.executor": "Run",
+    "Node.js.grabber.js.executor": "Run",
+    "Node.js.registration.js.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "SCRUM-50",
+    "javascript.preferred.runtime.type.id": "node",
+    "last_opened_file_path": "/home/ibolya/bpc/src",
+    "node.js.detected.package.jshint": "true",
+    "node.js.selected.package.jshint": "",
+    "nodejs_package_manager_path": "npm",
+    "ts.external.directory.path": "/home/ibolya/.local/share/JetBrains/Toolbox/apps/webstorm/plugins/javascript-plugin/jsLanguageServicesImpl/external"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+      <recent name="$PROJECT_DIR$/test" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Node.js Test Runner.grabber work">
+    <configuration name="grabber work" type="NodeJsTestRunner" temporary="true">
+      <node-interpreter value="project" />
+      <working-dir value="$PROJECT_DIR$" />
+      <language value="JAVA_SCRIPT" />
+      <typescript-loader value="MANUAL_SETUP_IN_NODE_OPTION" />
+      <envs />
+      <scope-kind value="TEST" />
+      <test-file value="$PROJECT_DIR$/test/registration.test.js" />
+      <test-names>
+        <test-name value="grabber work" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="the registration is audited with a UTC timestamp" type="NodeJsTestRunner" temporary="true">
+      <node-interpreter value="project" />
+      <working-dir value="$PROJECT_DIR$" />
+      <language value="JAVA_SCRIPT" />
+      <typescript-loader value="MANUAL_SETUP_IN_NODE_OPTION" />
+      <envs />
+      <scope-kind value="TEST" />
+      <test-file value="$PROJECT_DIR$/test/registration.test.js" />
+      <test-names>
+        <test-name value="the registration is audited with a UTC timestamp" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Node.js Test Runner.grabber work" />
+        <item itemvalue="Node.js Test Runner.the registration is audited with a UTC timestamp" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-WS-262.11879.105" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0679fca3-f380-49b6-ac5e-a6920279ba2b" name="Changes" comment="" />
+      <created>1794664255088</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1794664255088</updated>
+      <workItem from="1794664256943" duration="727000" />
+      <workItem from="1794667737035" duration="4933000" />
+      <workItem from="1794767229050" duration="1231000" />
+      <workItem from="1794918649850" duration="6386000" />
+      <workItem from="1794950655567" duration="4737000" />
+    </task>
+    <task id="LOCAL-00001" summary="it is finnaly now working correctly">
+      <option name="closed" value="true" />
+      <created>1794955818899</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1794955818899</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="it is finnaly now working correctly" />
+    <option name="LAST_COMMIT_MESSAGE" value="it is finnaly now working correctly" />
+  </component>
+</project>
