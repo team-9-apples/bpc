@@ -157,7 +157,7 @@ The BMF adapter (SCRUM-19, `src/adapters/bmf.js`) looks the partner up in the la
 The HFU adapter (SCRUM-67, `src/adapters/hfu.js`) asks the AGH web service of the Dachverband (HFU-Abfrage extern 3.0, SOAP) whether the partner is on the HFU-Gesamtliste today (Stichtag = today in Vienna), by UID only (OI-03).
 
 - On the list as employer (§ 67b ASVG) or as one-person company (§ 67e ASVG) is `VALID`; `details.listedAs` says which.
-- Not on the list is `NOT_FOUND` with `reason: "not on the HFU list"`. That is information, not a failed check: most companies are not on the list. A non-Austrian UID is `NOT_FOUND` without calling the service.
+- Not on the list is `NOT_FOUND` with `reason: "not on the HFU list"`. That is information, not a failed check: most companies are not on the list. A non-Austrian UID is `NOT_APPLICABLE` (SCRUM-42) without calling the service.
 - Service down, SOAP fault or an answer we do not understand is `UNAVAILABLE`.
 - The service needs the asking party's UID (`HFU_REQUESTER_UID`), which the ÖGK logs. Whose UID that should be is still open with the customer.
 - The service rejects requests with a `SOAPAction` header, so none is sent. `HFU_URL` can point at the ÖGK test system (`agh-ws-tt`, see `.dev.vars.example`), which answers fixed test data.

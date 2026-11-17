@@ -100,11 +100,11 @@ test('a company not on the list is NOT_FOUND with the note "not on the HFU list"
   assert.equal(result.details.uid, 'ATU12345678');
 });
 
-test('a non-Austrian UID is NOT_FOUND without calling the service', async () => {
+test('a non-Austrian UID is NOT_APPLICABLE without calling the service', async () => {
   const hfu = fakeHfu(answer());
   const result = await createHfuAdapter(env, hfu).check({ vat: 'DE123456789' });
-  assert.equal(result.state, 'NOT_FOUND');
-  assert.equal(result.details.reason, 'not on the HFU list');
+  assert.equal(result.state, 'NOT_APPLICABLE');
+  assert.match(result.details.reason, /only contains Austrian UIDs/);
   assert.equal(hfu.calls.length, 0);
 });
 

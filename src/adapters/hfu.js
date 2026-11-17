@@ -98,11 +98,12 @@ export function createHfuAdapter(env, { fetch = globalThis.fetch, now = () => ne
     source: 'HFU',
     async check({ vat }) {
       const partnerUid = normaliseUid(vat);
-      // Only Austrian companies can be on the list, so there is nothing to ask.
+      // SCRUM-42 / SCRUM-105: the HFU list only holds Austrian companies, so for a
+      // partner outside Austria the check does not apply and nothing is asked.
       if (!partnerUid) {
         return {
-          state: 'NOT_FOUND',
-          details: { reason: 'not on the HFU list', note: 'The HFU list only contains Austrian UIDs (ATU...)' },
+          state: 'NOT_APPLICABLE',
+          details: { reason: 'The HFU list only contains Austrian UIDs (ATU...)' },
         };
       }
 
