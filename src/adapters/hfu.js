@@ -1,22 +1,11 @@
-// SI-03 / SCRUM-67: HFU list (ÖGK) adapter. Asks the AGH web service of the
-// Dachverband (HFU-Abfrage extern, version 3.0) whether the partner is on the
-// HFU-Gesamtliste (§ 67b ASVG) today. The partner is identified by UID only (OI-03).
-//
-// Most companies are not on the list. That is normal, so "not on the list" is
-// NOT_FOUND (information), never INVALID.
-//
-// The service is SOAP. Its documentation asks for two things:
-// - no SOAPAction header (the server rejects requests that send one),
-// - the operation element qualified with the service namespace.
-// It also needs the identity of the asking party (uidAuftraggeber), which the
-// ÖGK logs. DI-04 / SCRUM-88: endpoint and that UID come from configuration
-// (HFU_URL, HFU_REQUESTER_UID). Without them the check reports UNAVAILABLE.
+// SI-03 / SCRUM-67: HFU list (ÖGK) adapter, AGH SOAP web service 3.0, by UID only (OI-03).
+// Not on the list is normal, so it is NOT_FOUND, never INVALID.
+
+// DI-04 / SCRUM-88: HFU_URL and HFU_REQUESTER_UID come from configuration.
+// Without them the check reports UNAVAILABLE.
 
 const TIMEOUT_MS = 10_000;
-// XML namespaces of SOAP and of the service (version 3.0). They are fixed names
-// from the WSDL, not addresses that are called, so they are not configuration.
-// They are joined from parts so the DI-04 scan for URLs in the code
-// (test/config.test.js) does not flag them.
+// XML namespaces, not called addresses. Joined so the DI-04 URL scan skips them.
 const namespace = (host) => ['http:', '', host, ''].join('/');
 const NAMESPACE = namespace('AGHExternWS_3_0.extern_3_0.ws.agh.noegkk.sozvers.at');
 const SOAP_ENVELOPE = namespace('schemas.xmlsoap.org/soap/envelope');
@@ -32,8 +21,7 @@ export function viennaDate(now = new Date()) {
   return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' });
 }
 
-// Both UIDs are checked by normaliseUid, so they hold only A-Z and 0-9 and
-// need no XML escaping.
+// Both UIDs went through normaliseUid, so no XML escaping is needed.
 export function buildRequest({ requesterUid, partnerUid, stichtag }) {
   return [
     `<soapenv:Envelope xmlns:soapenv="${SOAP_ENVELOPE}"`,
@@ -67,8 +55,7 @@ function element(xml, tag) {
   return text || null;
 }
 
-// Reads one auftragnehmerRS block. Throws if the answer is not one we know,
-// so runChecks reports UNAVAILABLE instead of a wrong result.
+// Throws on an unknown answer, so runChecks reports UNAVAILABLE.
 export function parseResponse(xml) {
   const fault = element(xml, 'faultstring');
   if (fault) throw new Error(`HFU service fault: ${fault}`);
@@ -98,8 +85,7 @@ export function createHfuAdapter(env, { fetch = globalThis.fetch, now = () => ne
     source: 'HFU',
     async check({ vat }) {
       const partnerUid = normaliseUid(vat);
-      // SCRUM-42 / SCRUM-105: the HFU list only holds Austrian companies, so for a
-      // partner outside Austria the check does not apply and nothing is asked.
+      // SCRUM-42: the HFU list only holds Austrian companies.
       if (!partnerUid) {
         return {
           state: 'NOT_APPLICABLE',
@@ -107,7 +93,6 @@ export function createHfuAdapter(env, { fetch = globalThis.fetch, now = () => ne
         };
       }
 
-      // runChecks turns a thrown error into UNAVAILABLE.
       if (!env.HFU_URL) throw new Error('HFU_URL is not configured');
       const requesterUid = normaliseUid(env.HFU_REQUESTER_UID);
       if (!requesterUid) throw new Error('HFU_REQUESTER_UID is not configured or not an ATU number');
@@ -121,7 +106,7 @@ export function createHfuAdapter(env, { fetch = globalThis.fetch, now = () => ne
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       const xml = await response.text();
-      // SOAP faults come with HTTP 500 and a faultstring; parseResponse reports those.
+      // SOAP faults come as HTTP 500; parseResponse reports them.
       if (!response.ok && !/faultstring/i.test(xml)) throw new Error(`HFU service answered HTTP ${response.status}`);
 
       const result = parseResponse(xml);
