@@ -28,6 +28,12 @@ export function clerkIdentity(env) {
       const { primaryEmailAddress } = await clerk.users.getUser(externalUserId);
       return primaryEmailAddress?.verification?.status === 'verified' ? primaryEmailAddress.emailAddress : null;
     },
+    // SCRUM-35: Clerk e-mails an invitation; its link lets the person set a
+    // password and then opens redirectUrl. Accepting it verifies the address.
+    // Throws if Clerk refuses (e.g. Clerk is unreachable).
+    async invite(email, redirectUrl) {
+      await clerk.invitations.createInvitation({ emailAddress: email, redirectUrl, ignoreExisting: true });
+    },
   };
 }
 
