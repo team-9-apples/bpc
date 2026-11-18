@@ -11,6 +11,7 @@ import { languageOf } from './language.js';
 import { mayOpen, pagesFor } from './pages.js';
 import { registerOrganisation } from './registration.js';
 import { getToken, getUser, listRequests, listTokens, listUsers, parseId } from './tenant.js';
+import { createUser } from './users.js';
 
 function json(body, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -125,6 +126,24 @@ async function startCheckRoute(request, env, ctx) {
   return json({ requestId: result.requestId }, 202);
 }
 
+// SCRUM-35 / FR-USR-01: POST /api/users { firstName, lastName, email, role } -> 201 { user }
+// Only an Organisation Admin may do this; the new user is invited through Clerk.
+const CREATE_USER_STATUS = { FORBIDDEN: 403, INVALID_INPUT: 400, EMAIL_IN_USE: 409, INVITE_FAILED: 502 };
+
+async function createUserRoute(request, env) {
+  const caller = await apiCaller(request, env);
+  if (!caller.user) return unauthorized(caller);
+
+  // The invitation link brings the person to our sign-up page to set a password.
+  const redirectUrl = new URL('/signup', request.url).href;
+  const deps = { db: env.DB, identity: identityOf(env), apiTokenId: caller.apiTokenId };
+  const result = await createUser(deps, caller.user, await readJson(request), redirectUrl);
+
+  if (result.ok) return json({ user: result.user }, 201);
+  const body = result.fields ? { error: result.error, fields: result.fields } : { error: result.error };
+  return json(body, CREATE_USER_STATUS[result.error]);
+}
+
 // SCRUM-40 / FR-USR-05: reading requests, users and tokens. Each kind has a
 // list (GET /api/<kind>) and a single item (GET /api/<kind>/<id>); both only
 // ever look inside the caller's own organisation (src/tenant.js).
@@ -166,6 +185,7 @@ export default {
     if (request.method === 'GET' && pathname === '/api/config') return config(env);
     if (request.method === 'GET' && pathname === '/api/me') return me(request, env);
     if (request.method === 'POST' && pathname === '/api/requests') return startCheckRoute(request, env, ctx);
+    if (request.method === 'POST' && pathname === '/api/users') return createUserRoute(request, env);
     if (pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     if (pathname === '/app' || pathname.startsWith('/app/')) return appPage(request, env);
     return env.ASSETS.fetch(request);
