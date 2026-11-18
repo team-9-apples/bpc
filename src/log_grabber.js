@@ -17,7 +17,7 @@ export async function detail_log(db,logid,org){
     try {
 
 
-        let log =await db.prepare('SELECT * FROM CHECK_RESULTS WHERE id=? AND organisation_id').bind(logid,org).all();
+        let log =await db.prepare('SELECT * FROM CHECK_RESULTS WHERE id=? AND organisation_id=?').bind(logid,org).all();
         return log
     }catch(err){
         return(err.message);
