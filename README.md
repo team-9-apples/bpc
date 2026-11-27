@@ -106,7 +106,18 @@ curl -X POST https://bpc.hsynrsd.dev/api/requests \
 - No token and no session: 401 `NOT_SIGNED_IN`. An unknown, revoked or expired token, or one whose user is deactivated: 401 `INVALID_TOKEN` (the same answer for each, so nobody can probe which tokens exist).
 - A token user has the same role rules as in the web app, e.g. a Review User's token gets 403 on `POST /api/requests`.
 - A request started with a token stores the token's user and `api_token_id` in `requests` and `audit_log` (FR-DOC-01). `last_used_at` is updated on each call.
-- `api_tokens` keeps only the SHA-256 hash of a token (`src/api-token.js`). Creating tokens in the web app is SCRUM-59.
+- `api_tokens` keeps only the SHA-256 hash of a token (`src/api-token.js`).
+
+### Creating a token (shown only once)
+
+SCRUM-69 (FR-API-07): the Organisation Admin creates tokens on **API tokens** (`/app/tokens.html`) or with the API.
+
+- `POST /api/tokens` `{ "userId", "name" }` answers 201 `{ "token": { id, userId, name, prefix, status, ... }, "secret": "bpc_..." }`. `secret` is the full token. This answer is the only time it is ever shown.
+- The database stores only the token's SHA-256 hash and its first 12 characters (`prefix`, e.g. `bpc_3fA9kQ2x`). `GET /api/tokens` and the web app list show the name and prefix, never the full token or its hash. A lost token cannot be shown again; create a new one.
+- The web page shows the new token once with a Copy button. It is only kept in the open page and is gone after "I have copied it", the next creation or a reload.
+- Only the Organisation Admin may create tokens (403 `FORBIDDEN` otherwise), and only for a Request User of their own organisation who is not deactivated. Anything else is 400 `INVALID_INPUT` with `fields.userId` or `fields.name` (`REQUIRED`, `INVALID`, `TOO_LONG`, max. 100 characters). One user may hold several tokens.
+- Each creation is written to `audit_log` as `TOKEN_CREATED` with the token ID and its user, never the token.
+- New tokens have no expiry (`expires_at` is NULL).
 
 ## Tenant isolation (FR-USR-05)
 

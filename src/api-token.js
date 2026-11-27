@@ -4,6 +4,8 @@
 // The api_tokens table (migration 0001) stores only the SHA-256 hash of the
 // token (QS-SEC-03), so we hash what was sent and look the hash up.
 
+import { publicToken } from './tenant.js';
+
 const USER_COLUMNS = 'u.id, u.organisation_id, u.email, u.first_name, u.last_name, u.role';
 
 /** The token from the Authorization header, or null if there is none. */
@@ -60,4 +62,77 @@ export async function tokenUser({ db, now = new Date() }, request) {
       organisationId: row.organisation_id,
     },
   };
+}
+
+// SCRUM-69 / FR-API-07: creating a token. The full token is returned only in
+// the answer to the create call and never again: the database keeps its hash
+// (for tokenUser above) and a short prefix (for the token list), and nothing
+// is written to the audit log or console that would let anyone rebuild it.
+//
+// The Organisation Admin creates tokens for Request Users of their own
+// organisation (SCRUM-59 / FR-API-04); one user may hold several tokens.
+
+const TOKEN_BYTES = 32; // 256 random bits
+const PREFIX_LENGTH = 12; // "bpc_" + 8 characters
+const MAX_TOKEN_NAME_LENGTH = 100;
+
+/** A new random token like "bpc_3fA9kQ2x...", base64url, 47 characters. */
+export function generateToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_BYTES));
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return `bpc_${base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+
+/** The part of a token that may be shown again after creation. */
+export const tokenPrefix = (token) => token.slice(0, PREFIX_LENGTH);
+
+/**
+ * Creates an API token for a Request User of the admin's organisation.
+ * input: { userId, name }.
+ * Returns { ok: true, token, secret } where secret is the full token, shown
+ * this one time, or { ok: false, error, fields? } with error FORBIDDEN or
+ * INVALID_INPUT. A user of another organisation is INVALID_INPUT, the same as
+ * a user that does not exist (FR-USR-05).
+ */
+export async function createApiToken({ db, apiTokenId = null, now = new Date() }, admin, input = {}) {
+  if (admin?.role !== 'ADMIN' || admin.organisationId == null) return { ok: false, error: 'FORBIDDEN' };
+
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  const userId = Number.isSafeInteger(input.userId) && input.userId > 0 ? input.userId : null;
+  const fields = {};
+  if (!name) fields.name = 'REQUIRED';
+  else if (name.length > MAX_TOKEN_NAME_LENGTH) fields.name = 'TOO_LONG';
+
+  // The organisation always comes from the admin, never from the input.
+  const owner =
+    userId === null
+      ? null
+      : await db
+          .prepare('SELECT id, role, status FROM users WHERE id = ? AND organisation_id = ?')
+          .bind(userId, admin.organisationId)
+          .first();
+  if (input.userId == null) fields.userId = 'REQUIRED';
+  else if (!owner || owner.role !== 'REQUEST_USER' || owner.status === 'DEACTIVATED') fields.userId = 'INVALID';
+  if (Object.keys(fields).length) return { ok: false, error: 'INVALID_INPUT', fields };
+
+  const secret = generateToken();
+  const at = now.toISOString();
+  const row = await db
+    .prepare(
+      `INSERT INTO api_tokens (user_id, name, secret_hash, prefix, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING id, user_id, name, prefix, status, expires_at, created_at, last_used_at`,
+    )
+    .bind(owner.id, name, await hashToken(secret), tokenPrefix(secret), at)
+    .first();
+
+  await db
+    .prepare(
+      `INSERT INTO audit_log (created_at, user_id, api_token_id, action, details)
+       VALUES (?, ?, ?, 'TOKEN_CREATED', json_object('created_token_id', ?, 'token_user_id', ?))`,
+    )
+    .bind(at, admin.id, apiTokenId, row.id, owner.id)
+    .run();
+
+  return { ok: true, token: publicToken(row), secret };
 }

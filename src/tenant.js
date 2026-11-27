@@ -67,13 +67,14 @@ export async function getUser({ db }, organisationId, userId) {
 
 // A token belongs to a user, and through that user to an organisation.
 // secret_hash is never selected: it must not leave the database (QS-SEC-03).
-const TOKEN_SELECT = `SELECT t.id, t.user_id, t.name, t.status, t.expires_at, t.created_at, t.last_used_at
+const TOKEN_SELECT = `SELECT t.id, t.user_id, t.name, t.prefix, t.status, t.expires_at, t.created_at, t.last_used_at
   FROM api_tokens t JOIN users u ON u.id = t.user_id`;
 
-const publicToken = (row) => ({
+export const publicToken = (row) => ({
   id: row.id,
   userId: row.user_id,
   name: row.name,
+  prefix: row.prefix, // SCRUM-69: only this start of the token is ever shown again
   status: row.status,
   expiresAt: row.expires_at,
   createdAt: row.created_at,
