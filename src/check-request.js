@@ -1,8 +1,10 @@
 // SCRUM-16: start a partner check by VAT number (optional FN).
 // SCRUM-20: run the checks of a request and store their results (FR-DOC-01)
 // SCRUM-96: store one overall status per request (CR-01)
+// SCRUM-22: log every request and every source call (QS-OBS-01, QS-OBS-02)
 
 import { runChecks } from './adapters/index.js';
+import { audit, auditStatement } from './audit.js';
 import { splitVat } from './adapters/vies.js';
 import { overallStatus } from './overall-status.js';
 
@@ -61,8 +63,6 @@ export function validateFn(input) {
 // Review Users may not; the Super Admin is outside every organisation.
 const ROLES_THAT_MAY_START = ['REQUEST_USER', 'ADMIN'];
 
-const auditSql = 'INSERT INTO audit_log (created_at, user_id, api_token_id, action, details) VALUES (?, ?, ?, ?, ?)';
-
 /**
  * Starts a check request for the given user.
  * user: the signed-in user from currentUser() in auth.js ({ id, organisationId, role, ... }).
@@ -89,10 +89,7 @@ export async function startCheck({ db, now = new Date(), apiTokenId = null }, us
   if (error) {
     // FR-REQ-10: a rejected input queries no source but is logged.
     // Only the error code is stored, not what was typed.
-    await db
-      .prepare(auditSql)
-      .bind(at, user.id, apiTokenId, 'REQUEST_REJECTED', JSON.stringify({ error }))
-      .run();
+    await audit(db, { at, userId: user.id, apiTokenId, action: 'REQUEST_REJECTED', details: { error } });
     return { ok: false, error };
   }
 
@@ -107,10 +104,7 @@ export async function startCheck({ db, now = new Date(), apiTokenId = null }, us
     .first();
 
   // 4. Log that a request was started (FR-LOG-03).
-  await db
-    .prepare(auditSql)
-    .bind(at, user.id, apiTokenId, 'REQUEST_STARTED', JSON.stringify({ requestId: row.id }))
-    .run();
+  await audit(db, { at, userId: user.id, apiTokenId, action: 'REQUEST_STARTED', details: { requestId: row.id } });
 
   return { ok: true, requestId: row.id };
 }
@@ -128,11 +122,14 @@ const insertResultSql =
   * source was queried, then marks the request COMPLETED and stores its overall
  * status in requests.summary (SCRUM-96). All rows are written in one batch,
  * so a request never ends up with only some of its results.
+ * SCRUM-22: the same batch logs one SOURCE_CALL per source that was asked and
+ * one REQUEST_COMPLETED, in the name of whoever started the request.
  * */
 export async function runAndSaveChecks({ db, adapters, now = () => new Date() }, requestId) {
-  // 1. Read back what was asked: the partner identifiers stored by startCheck.
+  // 1. Read back what was asked: the partner identifiers stored by startCheck,
+  // and who asked, so the log names the same user and token (QS-OBS-02).
   const request = await db
-    .prepare('SELECT input_vat, input_fn FROM requests WHERE id = ?')
+    .prepare('SELECT input_vat, input_fn, user_id, api_token_id FROM requests WHERE id = ?')
     .bind(requestId)
     .first();
   if (!request) {
@@ -148,10 +145,32 @@ export async function runAndSaveChecks({ db, adapters, now = () => new Date() },
   });
   // SCRUM-96: one overall status from all check states, e.g. 'INCOMPLETE'.                          
   const summary = overallStatus(results.map((result) => result.state));
+  const completedAt = now().toISOString();
   const complete = db
     .prepare("UPDATE requests SET status = 'COMPLETED', completed_at = ?, summary = ? WHERE id = ?")
-    .bind(now().toISOString(), summary, requestId);
-  await db.batch([...rows, complete]);
+    .bind(completedAt, summary, requestId);
+
+  // 4. Log it (QS-OBS-01). NOT_APPLICABLE sources were never called, so they
+  // get no SOURCE_CALL entry. Only the state is logged, not the source's answer.
+  const who = { userId: request.user_id, apiTokenId: request.api_token_id };
+  const calls = results
+    .filter((result) => result.state !== 'NOT_APPLICABLE')
+    .map((result) =>
+      auditStatement(db, {
+        ...who,
+        at: result.queriedAt,
+        action: 'SOURCE_CALL',
+        details: { requestId, source: result.source, state: result.state },
+      }),
+    );
+  const completedEntry = auditStatement(db, {
+    ...who,
+    at: completedAt,
+    action: 'REQUEST_COMPLETED',
+    details: { requestId, summary },
+  });
+
+  await db.batch([...rows, complete, ...calls, completedEntry]);
   return results;
 }
 

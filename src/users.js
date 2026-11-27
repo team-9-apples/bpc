@@ -7,6 +7,8 @@
 // links the account and makes it ACTIVE (linkExternalUser in registration.js),
 // and from then on they have the rights of their role.
 
+import { audit } from './audit.js';
+
 const EMAIL = /^[^\s@']+@[^\s@']+\.[^\s@']+$/; // same rule as registration.js
 const MAX_NAME_LENGTH = 200;
 const MAX_EMAIL_LENGTH = 254;
@@ -96,13 +98,13 @@ export async function createUser({ db, identity, apiTokenId = null, now = new Da
     return { ok: false, error: 'INVITE_FAILED' };
   }
 
-  await db
-    .prepare(
-      `INSERT INTO audit_log (created_at, user_id, api_token_id, action, details)
-       VALUES (?, ?, ?, 'USER_CREATED', json_object('created_user_id', ?, 'role', ?))`,
-    )
-    .bind(at, admin.id, apiTokenId, row.id, role)
-    .run();
+  await audit(db, {
+    at,
+    userId: admin.id,
+    apiTokenId,
+    action: 'USER_CREATED',
+    details: { created_user_id: row.id, role },
+  });
 
   return { ok: true, user: publicUser(row) };
 }
