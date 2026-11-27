@@ -117,7 +117,7 @@ SCRUM-69 (FR-API-07): the Organisation Admin creates tokens on **API tokens** (`
 - The web page shows the new token once with a Copy button. It is only kept in the open page and is gone after "I have copied it", the next creation or a reload.
 - Only the Organisation Admin may create tokens (403 `FORBIDDEN` otherwise), and only for a Request User of their own organisation who is not deactivated. Anything else is 400 `INVALID_INPUT` with `fields.userId` or `fields.name` (`REQUIRED`, `INVALID`, `TOO_LONG`, max. 100 characters). One user may hold several tokens.
 - Each creation is written to `audit_log` as `TOKEN_CREATED` with the token ID and its user, never the token.
-- New tokens have no expiry (`expires_at` is NULL).
+- SCRUM-60 (FR-API-05): tokens have no expiry. `expires_at` is always NULL for new tokens and cannot be set through the API; a token works until it is revoked or its user is deactivated (`test/token-no-expiry.test.js`).
 
 ## Tenant isolation (FR-USR-05)
 
