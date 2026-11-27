@@ -7,7 +7,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { SELECT_SUPER_ADMIN_SQL, insertSuperAdminSql, validateEmail } from './setup-lib.js';
+import { SELECT_SUPER_ADMIN_SQL, createSuperAdmin, validateEmail, wranglerDb } from './setup-lib.js';
 
 const DATABASE = process.env.D1_DATABASE ?? 'bpc';
 const target = process.argv.includes('--remote') ? '--remote' : '--local';
@@ -42,7 +42,12 @@ async function main() {
     return;
   }
 
-  query(insertSuperAdminSql({ email }));
+  // Creates the Super Admin and logs it in the audit log (SCRUM-22).
+  const id = await createSuperAdmin(wranglerDb(query), { email });
+  if (id === null) {
+    console.log('Super Admin was created by someone else in the meantime. Nothing to create.');
+    return;
+  }
   console.log(`Created Super Admin ${email}.`);
   console.log('Next: create the account with this e-mail address on /signup. The first sign-in links it (SCRUM-104).');
 }
