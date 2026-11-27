@@ -11,6 +11,20 @@ export function validateEmail(email) {
   }
 }
 
+/**
+ * Reads KEY=VALUE lines from the text of a .dev.vars file. Blank lines and
+ * # comments are skipped; quotes around a value are removed.
+ */
+export function parseDevVars(text) {
+  const vars = {};
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!match || line.trimStart().startsWith('#')) continue;
+    vars[match[1]] = match[2].replace(/^(["'])(.*)\1$/, '$2');
+  }
+  return vars;
+}
+
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
 
 export const SELECT_SUPER_ADMIN_SQL = "SELECT email FROM users WHERE role = 'SUPER_ADMIN'";

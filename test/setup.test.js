@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { SYSTEM } from '../src/audit.js';
-import { SELECT_SUPER_ADMIN_SQL, createSuperAdmin, inlineParams, validateEmail, wranglerDb } from '../scripts/setup-lib.js';
+import { SELECT_SUPER_ADMIN_SQL, createSuperAdmin, inlineParams, parseDevVars, validateEmail, wranglerDb } from '../scripts/setup-lib.js';
 import { d1, migratedDatabase } from './d1.js';
 
 const schema = readFileSync(new URL('../migrations/0001_initial_schema.sql', import.meta.url), 'utf8');
@@ -84,4 +84,9 @@ test('creating the Super Admin is logged in UTC with SYSTEM as the actor, a seco
 test('invalid e-mail is rejected', () => {
   assert.throws(() => validateEmail(undefined), /SUPER_ADMIN_EMAIL/);
   assert.throws(() => validateEmail('not-an-email'), /SUPER_ADMIN_EMAIL/);
+});
+
+test('parseDevVars reads KEY=VALUE lines and skips comments and blanks', () => {
+  const text = '# comment\r\nSUPER_ADMIN_EMAIL=ops@example.com\r\n\r\nQUOTED = "a b"\n#OTHER=x\n';
+  assert.deepEqual(parseDevVars(text), { SUPER_ADMIN_EMAIL: 'ops@example.com', QUOTED: 'a b' });
 });
