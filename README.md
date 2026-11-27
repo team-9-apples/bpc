@@ -125,6 +125,7 @@ SCRUM-61 (FR-API-06): the **API tokens** page lists every token of the organisat
 
 - `POST /api/tokens/<id>/revoke` answers 200 `{ "token" }` with status `REVOKED`. Revoking an already revoked token is also 200 and changes nothing.
 - The very next API call with a revoked token gets 401 `INVALID_TOKEN`, because the status is checked on every call. The user's other tokens keep working.
+- SCRUM-78 (QS-SEC-05, revocation within 1 minute): tokens are never cached, so revocation takes effect at once. Adding a token cache later would break this unless it expires within a minute (`test/token-revocation-time.test.js`).
 - Only the Organisation Admin may revoke (403 `FORBIDDEN` otherwise). A token of another organisation, or an unknown ID, gives 404 `NOT_FOUND`.
 - Revoked tokens stay in the list, marked as revoked. Each revocation is written to `audit_log` as `TOKEN_REVOKED`.
 

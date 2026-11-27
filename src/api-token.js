@@ -3,6 +3,9 @@
 //   Authorization: Bearer bpc_...
 // The api_tokens table (migration 0001) stores only the SHA-256 hash of the
 // token (QS-SEC-03), so we hash what was sent and look the hash up.
+// SCRUM-78 / QS-SEC-05: tokens are never cached. Every call reads the token
+// and its user from the database, so a revoked token or a deactivated user is
+// refused from the next call on (the requirement allows up to one minute).
 
 import { getToken, publicToken } from './tenant.js';
 
