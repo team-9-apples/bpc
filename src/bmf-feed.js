@@ -8,6 +8,8 @@
 // DI-04 / SCRUM-88: the feed address comes from the BMF_FEED_URL variable, not
 // from the code (see .dev.vars.example). Without it the run is logged as FAILED.
 
+import { SYSTEM, auditStatement } from './audit.js';
+
 const TIMEOUT_MS = 30_000;
 
 // Windows-1252 characters for the bytes 0x80-0x9F. Browsers decode ISO-8859-1
@@ -134,7 +136,8 @@ function insertEntries(db, entries) {
   return statements;
 }
 
-const INSERT_AUDIT = `INSERT INTO audit_log (created_at, action, details) VALUES (?, 'BMF_FEED_FETCH', ?)`;
+// The fetch runs on a schedule, so the system is the actor (QS-OBS-02).
+const fetchLogged = (db, at, details) => auditStatement(db, { at, actor: SYSTEM, action: 'BMF_FEED_FETCH', details });
 
 function failureMessage(error) {
   if (error?.name === 'TimeoutError') return `BMF feed did not answer within ${TIMEOUT_MS / 1000} s`;
@@ -162,7 +165,7 @@ export async function refreshBmfFeed(env, { fetch = globalThis.fetch, now = () =
     const message = failureMessage(error);
     await db.batch([
       db.prepare(INSERT_FETCH).bind(fetchedAt, 'FAILED', null, null, message),
-      db.prepare(INSERT_AUDIT).bind(fetchedAt, JSON.stringify({ status: 'FAILED', error: message })),
+      fetchLogged(db, fetchedAt, { status: 'FAILED', error: message }),
     ]);
     return { status: 'FAILED', fetchedAt, error: message };
   }
@@ -173,9 +176,7 @@ export async function refreshBmfFeed(env, { fetch = globalThis.fetch, now = () =
     db.prepare(INSERT_FETCH).bind(fetchedAt, 'OK', feed.publishedAt, feed.entries.length, null),
     db.prepare('DELETE FROM bmf_feed_entries'),
     ...insertEntries(db, feed.entries),
-    db
-      .prepare(INSERT_AUDIT)
-      .bind(fetchedAt, JSON.stringify({ status: 'OK', feedPublishedAt: feed.publishedAt, entries: feed.entries.length })),
+    fetchLogged(db, fetchedAt, { status: 'OK', feedPublishedAt: feed.publishedAt, entries: feed.entries.length }),
   ]);
   return { status: 'OK', fetchedAt, feedPublishedAt: feed.publishedAt, entries: feed.entries.length };
 }

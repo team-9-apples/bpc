@@ -7,6 +7,8 @@
 // the person has verified the e-mail address there (FR-ORG-02),
 // linkExternalUser() stores the provider's user id and activates the account.
 
+import { audit } from './audit.js';
+
 const EMAIL = /^[^\s@']+@[^\s@']+\.[^\s@']+$/; // same rule as setup-lib.js
 const MAX_NAME_LENGTH = 200;
 
@@ -117,10 +119,7 @@ export async function linkExternalUser({ db, now = new Date() }, { email, extern
     .bind(externalUserId, email.trim())
     .first();
   if (user) {
-    await db
-      .prepare("INSERT INTO audit_log (created_at, user_id, action, details) VALUES (?, ?, 'ACCOUNT_ACTIVATED', '{}')")
-      .bind(now.toISOString(), user.id)
-      .run();
+    await audit(db, { at: now, userId: user.id, action: 'ACCOUNT_ACTIVATED' });
   }
   return user;
 }

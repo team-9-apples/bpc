@@ -22,3 +22,7 @@ HFU_REQUESTER_UID=ATU12345678
 
 # BMF fake company feed, Liste der Scheinunternehmen (FR-DOC-06).
 BMF_FEED_URL=https://service.bmf.gv.at/service/allg/lsu/rss_lsu.asp
+
+# E-mail address of the one Super Admin, read by `npm run setup` (DI-01).
+# Only the setup script uses it; it is not a Worker secret.
+SUPER_ADMIN_EMAIL=ops@example.com

@@ -7,6 +7,7 @@
 // and its user from the database, so a revoked token or a deactivated user is
 // refused from the next call on (the requirement allows up to one minute).
 
+import { audit, auditStatement } from './audit.js';
 import { getToken, publicToken } from './tenant.js';
 
 const USER_COLUMNS = 'u.id, u.organisation_id, u.email, u.first_name, u.last_name, u.role';
@@ -129,13 +130,13 @@ export async function createApiToken({ db, apiTokenId = null, now = new Date() }
     .bind(owner.id, name, await hashToken(secret), tokenPrefix(secret), at)
     .first();
 
-  await db
-    .prepare(
-      `INSERT INTO audit_log (created_at, user_id, api_token_id, action, details)
-       VALUES (?, ?, ?, 'TOKEN_CREATED', json_object('created_token_id', ?, 'token_user_id', ?))`,
-    )
-    .bind(at, admin.id, apiTokenId, row.id, owner.id)
-    .run();
+  await audit(db, {
+    at,
+    userId: admin.id,
+    apiTokenId,
+    action: 'TOKEN_CREATED',
+    details: { created_token_id: row.id, token_user_id: owner.id },
+  });
 
   return { ok: true, token: publicToken(row), secret };
 }
@@ -158,14 +159,17 @@ export async function revokeApiToken({ db, apiTokenId = null, now = new Date() }
   if (token.status === 'REVOKED') return { ok: true, token };
 
   const at = now.toISOString();
-  await db.prepare("UPDATE api_tokens SET status = 'REVOKED' WHERE id = ?").bind(token.id).run();
-  await db
-    .prepare(
-      `INSERT INTO audit_log (created_at, user_id, api_token_id, action, details)
-       VALUES (?, ?, ?, 'TOKEN_REVOKED', json_object('revoked_token_id', ?, 'token_user_id', ?))`,
-    )
-    .bind(at, admin.id, apiTokenId, token.id, token.userId)
-    .run();
+  // One batch: the token is revoked and the revocation is logged, or neither.
+  await db.batch([
+    db.prepare("UPDATE api_tokens SET status = 'REVOKED' WHERE id = ?").bind(token.id),
+    auditStatement(db, {
+      at,
+      userId: admin.id,
+      apiTokenId,
+      action: 'TOKEN_REVOKED',
+      details: { revoked_token_id: token.id, token_user_id: token.userId },
+    }),
+  ]);
 
   return { ok: true, token: { ...token, status: 'REVOKED' } };
 }

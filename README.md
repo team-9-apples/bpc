@@ -10,15 +10,18 @@ Prerequisites: Node.js 22.5 or later, and `npm install`.
 
 ```sh
 # Local development database (stored in .wrangler/)
-SUPER_ADMIN_EMAIL=ops@example.com npm run setup
+npm run setup
 
 # Cloudflare D1 (needs `npx wrangler login` and the real database_id in wrangler.toml)
-SUPER_ADMIN_EMAIL=ops@example.com npm run setup -- --remote
+npm run setup -- --remote
 ```
+
+The script reads `SUPER_ADMIN_EMAIL` from the shell, or else from `.dev.vars` (see `.dev.vars.example`).
+It is only used by the setup script, not by the Worker, so it is not a Wrangler secret.
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `SUPER_ADMIN_EMAIL` | yes | E-mail address of the Super Admin |
+| `SUPER_ADMIN_EMAIL` | yes | E-mail address of the Super Admin (shell or `.dev.vars`) |
 | `D1_DATABASE` | no | D1 database name, default `bpc` |
 
 What the script does:
@@ -47,7 +50,7 @@ npm run deploy   # deploy to https://bpc.hsynrsd.dev (needs `npx wrangler login`
 First deployment on a new Cloudflare account:
 
 1. `npx wrangler d1 create bpc --location weur` and put the printed `database_id` in `wrangler.toml`.
-2. `SUPER_ADMIN_EMAIL=... npm run setup -- --remote` to create the schema and the Super Admin.
+2. Put `SUPER_ADMIN_EMAIL` in `.dev.vars` and run `npm run setup -- --remote` to create the schema and the Super Admin.
 3. Set the configuration as Wrangler secrets (see Configuration below): `npx wrangler secret put <NAME>` for `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VIES_URL` and `BMF_FEED_URL`.
 4. `npm run deploy`. Wrangler creates the custom domain and its TLS certificate. The zone (`hsynrsd.dev`) must be on the same Cloudflare account.
 
