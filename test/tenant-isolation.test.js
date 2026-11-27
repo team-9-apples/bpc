@@ -120,7 +120,7 @@ test('opening a request, user or token of another organisation gives 404', async
 test('a token never shows its secret hash', async () => {
   const { db } = await setup();
   const { body } = await get(db, '/api/tokens', ADMIN_A[0]);
-  assert.deepEqual(Object.keys(body.tokens[0]).sort(), ['createdAt', 'expiresAt', 'id', 'lastUsedAt', 'name', 'status', 'userId']);
+  assert.deepEqual(Object.keys(body.tokens[0]).sort(), ['createdAt', 'expiresAt', 'id', 'lastUsedAt', 'name', 'prefix', 'status', 'userId']);
   assert.doesNotMatch(JSON.stringify(await get(db, '/api/tokens/100', ADMIN_A[0])), /hash/i);
 });
 

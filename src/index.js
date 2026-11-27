@@ -2,7 +2,7 @@
 // static assets from public/; requests to /api/* run this code first, so the
 // web app and the API share one domain.
 
-import { bearerToken, tokenUser } from './api-token.js';
+import { bearerToken, createApiToken, revokeApiToken, tokenUser } from './api-token.js';
 import { clerkIdentity, currentUser } from './auth.js';
 import { refreshBmfFeed } from './bmf-feed.js';
 import { createAdapters } from './adapters/index.js';
@@ -144,6 +144,30 @@ async function createUserRoute(request, env) {
   return json(body, CREATE_USER_STATUS[result.error]);
 }
 
+// SCRUM-69 / FR-API-07: POST /api/tokens { userId, name } -> 201 { token, secret }
+// secret is the full token. This answer is the only place it ever appears;
+// afterwards GET /api/tokens shows only the name and prefix.
+async function createTokenRoute(request, env) {
+  const caller = await apiCaller(request, env);
+  if (!caller.user) return unauthorized(caller);
+
+  const result = await createApiToken({ db: env.DB, apiTokenId: caller.apiTokenId }, caller.user, await readJson(request));
+  if (result.ok) return json({ token: result.token, secret: result.secret }, 201);
+  if (result.error === 'FORBIDDEN') return json({ error: result.error }, 403);
+  return json({ error: result.error, fields: result.fields }, 400);
+}
+
+// SCRUM-61 / FR-API-06: POST /api/tokens/<id>/revoke -> 200 { token }
+async function revokeTokenRoute(request, env, idText) {
+  const caller = await apiCaller(request, env);
+  if (!caller.user) return unauthorized(caller);
+
+  const deps = { db: env.DB, apiTokenId: caller.apiTokenId };
+  const result = await revokeApiToken(deps, caller.user, parseId(idText));
+  if (result.ok) return json({ token: result.token });
+  return json({ error: result.error }, result.error === 'FORBIDDEN' ? 403 : 404);
+}
+
 // SCRUM-40 / FR-USR-05: reading requests, users and tokens. Each kind has a
 // list (GET /api/<kind>) and a single item (GET /api/<kind>/<id>); both only
 // ever look inside the caller's own organisation (src/tenant.js).
@@ -173,6 +197,7 @@ async function readRoute(request, env, kind, idText) {
   return item ? json({ [one]: item }) : json({ error: 'NOT_FOUND' }, 404);
 }
 
+const REVOKE_PATH = /^\/api\/tokens\/([^/]+)\/revoke$/;
 const READ_PATH = /^\/api\/(requests|users|tokens)(?:\/([^/]+))?$/;
 
 export default {
@@ -186,6 +211,9 @@ export default {
     if (request.method === 'GET' && pathname === '/api/me') return me(request, env);
     if (request.method === 'POST' && pathname === '/api/requests') return startCheckRoute(request, env, ctx);
     if (request.method === 'POST' && pathname === '/api/users') return createUserRoute(request, env);
+    if (request.method === 'POST' && pathname === '/api/tokens') return createTokenRoute(request, env);
+    const revoke = request.method === 'POST' ? REVOKE_PATH.exec(pathname) : null;
+    if (revoke) return revokeTokenRoute(request, env, revoke[1]);
     if (pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     if (pathname === '/app' || pathname.startsWith('/app/')) return appPage(request, env);
     return env.ASSETS.fetch(request);
