@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SOURCES } from '../src/adapters/index.js';
+import { createApiToken, revokeApiToken } from '../src/api-token.js';
 import { SYSTEM, audit, auditStatement } from '../src/audit.js';
 import { refreshBmfFeed } from '../src/bmf-feed.js';
 import { runAndSaveChecks, startCheck } from '../src/check-request.js';
@@ -36,7 +37,7 @@ async function withCompletedRequest() {
   return { sqlite, db, requestId };
 }
 
-test('a demo session logs every request, source call, feed fetch and user creation in UTC', async () => {
+test('a demo session logs every request, source call, feed fetch, user and token change in UTC', async () => {
   const sqlite = migratedDatabase();
   const db = d1(sqlite);
 
@@ -53,6 +54,11 @@ test('a demo session logs every request, source call, feed fetch and user creati
   const created = await createUser({ db, identity }, admin, { firstName: 'Rita', lastName: 'Request', email: 'rita@example.at', role: 'REQUEST_USER' }, 'https://bpc.example/signup');
   assert.equal(created.ok, true);
 
+  // The admin creates an API token for that user and revokes it again.
+  const token = await createApiToken({ db }, admin, { userId: created.user.id, name: 'ERP' });
+  assert.equal(token.ok, true);
+  assert.equal((await revokeApiToken({ db }, admin, token.token.id)).ok, true);
+
   // An Austrian check (all five sources), a German one (only VIES), and a rejected input.
   for (const vat of ['ATU12345678', 'DE123456789']) {
     const { requestId } = await startCheck({ db }, admin, { vat });
@@ -68,6 +74,8 @@ test('a demo session logs every request, source call, feed fetch and user creati
   assert.equal(count('ORGANISATION_REGISTERED'), 1);
   assert.equal(count('ACCOUNT_ACTIVATED'), 1);
   assert.equal(count('USER_CREATED'), 1);
+  assert.equal(count('TOKEN_CREATED'), 1);
+  assert.equal(count('TOKEN_REVOKED'), 1);
   assert.equal(count('REQUEST_STARTED'), 2);
   assert.equal(count('REQUEST_REJECTED'), 1);
   assert.equal(count('REQUEST_COMPLETED'), 2);
