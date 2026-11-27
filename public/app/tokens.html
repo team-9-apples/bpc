@@ -12,7 +12,9 @@
        Shows GET /api/tokens, which only returns the caller's own organisation.
        SCRUM-69: the form creates a token with POST /api/tokens. The full token
        is shown only here, right after creating it, and only kept in this page;
-       the list shows just its name and prefix. -->
+       the list shows just its name and prefix.
+       SCRUM-61: the list shows every token of the organisation with its user,
+       and the admin revokes a token with POST /api/tokens/<id>/revoke. -->
   <header id="app-header"></header>
   <main>
     <h1 id="title"></h1>
@@ -37,7 +39,7 @@
   </main>
 
   <script>
-    const { lang, t, start, showList } = appShell;
+    const { lang, t, start } = appShell;
     const texts = {
       en: {
         formTitle: 'Create a token',
@@ -52,7 +54,13 @@
         copied: 'Copied.',
         done: 'I have copied it',
         check: 'Please check',
-        errors: { FORBIDDEN: 'Only Organisation Admins can create tokens.' },
+        errors: { FORBIDDEN: 'Only Organisation Admins can manage tokens.', NOT_FOUND: 'This token does not exist.' },
+        columns: ['Name', 'Prefix', 'User', 'Created', 'Last used', 'Status', ''],
+        status: { ACTIVE: 'Active', REVOKED: 'Revoked' },
+        never: 'never',
+        revoke: 'Revoke',
+        confirmRevoke: (name) => `Revoke token "${name}"? Programs using it will be refused from their next call. This cannot be undone.`,
+        revoked: (name) => `Token "${name}" revoked.`,
       },
       de: {
         formTitle: 'Token erstellen',
@@ -67,7 +75,13 @@
         copied: 'Kopiert.',
         done: 'Ich habe ihn kopiert',
         check: 'Bitte prüfen',
-        errors: { FORBIDDEN: 'Nur Organisations-Admins können Tokens erstellen.' },
+        errors: { FORBIDDEN: 'Nur Organisations-Admins können Tokens verwalten.', NOT_FOUND: 'Diesen Token gibt es nicht.' },
+        columns: ['Name', 'Präfix', 'Benutzer', 'Erstellt', 'Zuletzt verwendet', 'Status', ''],
+        status: { ACTIVE: 'Aktiv', REVOKED: 'Widerrufen' },
+        never: 'nie',
+        revoke: 'Widerrufen',
+        confirmRevoke: (name) => `Token „${name}“ widerrufen? Programme, die ihn verwenden, werden ab dem nächsten Aufruf abgewiesen. Das kann nicht rückgängig gemacht werden.`,
+        revoked: (name) => `Token „${name}“ widerrufen.`,
       },
     }[lang];
 
@@ -81,12 +95,56 @@
     const content = document.getElementById('content');
     const newToken = document.getElementById('new-token');
     const newTokenValue = document.getElementById('new-token-value');
-    const loadList = () => showList(content, '/api/tokens', 'tokens', null);
+    const { el } = appShell;
+    let userById = new Map();
+
+    // SCRUM-61: every token of the organisation with its user; never the full token.
+    async function loadList() {
+      content.replaceChildren(t.loading);
+      const response = await fetch('/api/tokens').catch(() => null);
+      if (!response?.ok) return content.replaceChildren(el('p', { textContent: t.error }));
+      const { tokens } = await response.json();
+      if (!tokens.length) return content.replaceChildren(el('p', { textContent: t.empty }));
+      const head = el('tr', {}, texts.columns.map((c) => el('th', { textContent: c })));
+      const rows = tokens.map((token) => {
+        const user = userById.get(token.userId);
+        const cells = [
+          token.name,
+          token.prefix ? `${token.prefix}…` : '',
+          user ? `${user.firstName} ${user.lastName} (${user.email})` : `#${token.userId}`,
+          new Date(token.createdAt).toLocaleString(lang),
+          token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString(lang) : texts.never,
+          texts.status[token.status] ?? token.status,
+        ].map((value) => el('td', { textContent: value }));
+        const action = el('td');
+        if (token.status === 'ACTIVE') {
+          const button = el('button', { type: 'button', textContent: texts.revoke });
+          button.addEventListener('click', () => revokeToken(token, button));
+          action.append(button);
+        }
+        return el('tr', {}, [...cells, action]);
+      });
+      content.replaceChildren(el('table', {}, [el('thead', {}, [head]), el('tbody', {}, rows)]));
+    }
+
+    async function revokeToken(token, button) {
+      if (!confirm(texts.confirmRevoke(token.name))) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/tokens/${token.id}/revoke`, { method: 'POST' });
+        const body = await response.json().catch(() => ({}));
+        message.textContent = response.ok ? texts.revoked(token.name) : texts.errors[body.error] ?? t.error;
+      } catch {
+        message.textContent = t.error;
+      }
+      loadList();
+    }
 
     // Only active or invited Request Users can get a token (FR-API-04).
     async function loadUsers() {
       const response = await fetch('/api/users').catch(() => null);
       const body = response?.ok ? await response.json() : { users: [] };
+      userById = new Map(body.users.map((u) => [u.id, u]));
       const users = body.users.filter((u) => u.role === 'REQUEST_USER' && u.status !== 'DEACTIVATED');
       form.userId.replaceChildren(
         ...users.map((u) => appShell.el('option', { value: String(u.id), textContent: `${u.firstName} ${u.lastName} (${u.email})` })),
@@ -102,8 +160,7 @@
     }
 
     start();
-    loadUsers();
-    loadList();
+    loadUsers().then(loadList);
 
     document.getElementById('copy').addEventListener('click', async () => {
       try {

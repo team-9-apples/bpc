@@ -119,6 +119,15 @@ SCRUM-69 (FR-API-07): the Organisation Admin creates tokens on **API tokens** (`
 - Each creation is written to `audit_log` as `TOKEN_CREATED` with the token ID and its user, never the token.
 - SCRUM-60 (FR-API-05): tokens have no expiry. `expires_at` is always NULL for new tokens and cannot be set through the API; a token works until it is revoked or its user is deactivated (`test/token-no-expiry.test.js`).
 
+### Listing and revoking tokens
+
+SCRUM-61 (FR-API-06): the **API tokens** page lists every token of the organisation with its name, prefix, user, creation date, last use and status, and the Organisation Admin can revoke any active token there.
+
+- `POST /api/tokens/<id>/revoke` answers 200 `{ "token" }` with status `REVOKED`. Revoking an already revoked token is also 200 and changes nothing.
+- The very next API call with a revoked token gets 401 `INVALID_TOKEN`, because the status is checked on every call. The user's other tokens keep working.
+- Only the Organisation Admin may revoke (403 `FORBIDDEN` otherwise). A token of another organisation, or an unknown ID, gives 404 `NOT_FOUND`.
+- Revoked tokens stay in the list, marked as revoked. Each revocation is written to `audit_log` as `TOKEN_REVOKED`.
+
 ## Tenant isolation (FR-USR-05)
 
 SCRUM-40: a user only sees data of their own organisation, in the web app (Clerk session) and over the API (token).

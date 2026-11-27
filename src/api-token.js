@@ -4,7 +4,7 @@
 // The api_tokens table (migration 0001) stores only the SHA-256 hash of the
 // token (QS-SEC-03), so we hash what was sent and look the hash up.
 
-import { publicToken } from './tenant.js';
+import { getToken, publicToken } from './tenant.js';
 
 const USER_COLUMNS = 'u.id, u.organisation_id, u.email, u.first_name, u.last_name, u.role';
 
@@ -135,4 +135,34 @@ export async function createApiToken({ db, apiTokenId = null, now = new Date() }
     .run();
 
   return { ok: true, token: publicToken(row), secret };
+}
+
+// SCRUM-61 / FR-API-06: the Organisation Admin revokes any token of their
+// organisation. tokenUser() reads the status on every call, so the very next
+// call with a revoked token gets 401 INVALID_TOKEN.
+
+/**
+ * Revokes a token of the admin's organisation.
+ * Returns { ok: true, token } or { ok: false, error } with FORBIDDEN or
+ * NOT_FOUND (also for a token of another organisation, FR-USR-05).
+ * Revoking a token that is already revoked changes nothing and is not an error.
+ */
+export async function revokeApiToken({ db, apiTokenId = null, now = new Date() }, admin, tokenId) {
+  if (admin?.role !== 'ADMIN' || admin.organisationId == null) return { ok: false, error: 'FORBIDDEN' };
+
+  const token = tokenId == null ? null : await getToken({ db }, admin.organisationId, tokenId);
+  if (!token) return { ok: false, error: 'NOT_FOUND' };
+  if (token.status === 'REVOKED') return { ok: true, token };
+
+  const at = now.toISOString();
+  await db.prepare("UPDATE api_tokens SET status = 'REVOKED' WHERE id = ?").bind(token.id).run();
+  await db
+    .prepare(
+      `INSERT INTO audit_log (created_at, user_id, api_token_id, action, details)
+       VALUES (?, ?, ?, 'TOKEN_REVOKED', json_object('revoked_token_id', ?, 'token_user_id', ?))`,
+    )
+    .bind(at, admin.id, apiTokenId, token.id, token.userId)
+    .run();
+
+  return { ok: true, token: { ...token, status: 'REVOKED' } };
 }
